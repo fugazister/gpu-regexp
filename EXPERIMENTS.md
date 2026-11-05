@@ -168,13 +168,13 @@ The final score is 169/201, **84.1% (95% CI 78.4–88.5)**. This is suggestive, 
 
 Rules, set before scoring the two test splits:
 
-- **Scope is judged from the gold regex alone,** never from the model's output: a sequence of single quantified characters or classes, optionally inside starts-with, ends-with or contains, or a top-level choice between atoms. Only about 16% of descriptions qualify, because the rest use nested `and`, `not` or repeated groups.
+- **Scope is judged from the gold regex alone,** never from the model's output: a sequence of single quantified characters or classes, optionally inside starts-with, ends-with or contains, or a top-level choice between atoms. Only about 17% of descriptions qualify, because the rest use nested `and`, `not` or repeated groups.
 - **Confidence intervals resample by regex,** since descriptions of one regex share their examples and aren't independent.
 - **Whole-string scoring barely helps.** Counting a regex that passes once anchored adds 0 to 3 prompts per split, so missing anchors aren't the problem.
 
 ### Why it fails, from reading `dev`
 
-- **Sentence periods become literals.** `A string that contains a '*'.` gives `^.*\*\..*$`, which demands a real period. Removing sentence-ending periods from `dev` raised passes from 11 to 18, and in scope from 5 to 9. It's the cheapest fix available, because the training data never pairs periods with prose.
+- **Sentence periods become literals.** `A string that contains a '*'.` gives `^.*\*\..*$`, which demands a real period. Removing sentence-ending periods from `dev` raised passes from 11 to 18, and in scope from 5 to 9. It's the cheapest fix available, and the training data explains it: across 20,000 generated prompts, a period ended the prompt only 16 times and was never labelled as filler.
 - **Long multi-sentence prose is outside the training distribution.** The median description is about 36 tokens, and 41 of the 351 on `dev` exceed the 48-token limit. The grammar's prompts are short.
 - **Unseen structure.** `A list of four strings. The first ...` has no counterpart in the grammar, so words like `first` and `second` leak into the regex.
 - **Some outputs are confidently wrong.** `The string consists of 1 or more capital letters, followed by ...` was read as an unordered "contains all of these".
