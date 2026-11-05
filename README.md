@@ -2,7 +2,11 @@
 
 Describe a pattern in English and get a regex. A 44K-parameter model labels your words, on WebGPU or the CPU, and a deterministic compiler turns the labels into the regex. It runs entirely in the browser.
 
+**[Try the demo](https://fugazister.github.io/gpu-regexp/)**
+
 An experiment inspired by [gpu-lexer](https://shud.in/thoughts/ideas-behind-gpu-lexer) and the projects that followed it. **Check the regex before you ship it.**
+
+To run it locally:
 
 ```sh
 python3 -m http.server -d web 8000   # then open http://localhost:8000
