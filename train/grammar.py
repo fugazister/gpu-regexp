@@ -40,6 +40,8 @@ FORMATS = {"<DATE_ISO>": ["yyyy-mm-dd", "iso", "iso 8601"], "<DATE_US>": ["mm/dd
 
 # Short everyday words people use as literals, even though the grammar also uses some of them.
 PLAIN_LITS = "yes no on off in out up down start stop end true false get set new old first last left right top bottom open close none".split()
+# Roles that can open a new sentence.
+SENTENCE_STARTS = ("THEN", "START", "END", "CONTAINS")
 SUBJECT = ["string", "strings", "line", "lines", "text", "input", "value", "values", "anything", "something",
            "any line", "any string", "a line", "a string", "the string", "the line", "a value"]
 
@@ -524,7 +526,21 @@ class Gen:
                 segs[i] = (new, segs[i][1], segs[i][2])
             if self.r.random() < 0.06 and segs[0][1] not in ("LIT", "NUM"):
                 segs[0] = (segs[0][0].capitalize(), segs[0][1], segs[0][2])
+            segs = self.sentences(segs)
         return segs, rx, ("im" if icase else "m"), has_typo
+
+    def sentences(self, segs):
+        """People write in sentences, so a period closing a clause or the prompt is usually filler."""
+        out = []
+        for i, t in enumerate(segs):
+            if i and t[1] in SENTENCE_STARTS and not t[2] and self.r.random() < 0.15:
+                out.append(S(".", "O", True))
+                if self.r.random() < 0.7:
+                    t = (t[0].capitalize(), t[1], t[2])
+            out.append(t)
+        if self.r.random() < 0.3:
+            out.append(S(".", "O", True))
+        return out
 
     def sample(self):
         """-> dict(text, roles per token, regex, flags, typo). Retries on anything too long."""

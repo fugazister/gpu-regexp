@@ -173,4 +173,7 @@ if (verbose) {
   for (const c of scoped) console.log(`${c.asIs ? "pass" : c.whole ? "WHOLE" : "FAIL"}  ${c.q}\n      got /${c.source}/${c.flags}   gold ${c.spec}`);
   for (const c of cases.filter((c) => !c.goldOk).slice(0, 10)) console.log(`GOLD-MISMATCH ${c.spec}\n   yes ${c.yes.join(" ")}\n   no ${c.no.join(" ")}`);
 }
-if (jsonAt >= 0) writeFileSync(args[jsonAt + 1], JSON.stringify({ split, n: cases.length, goldOk, rows }, null, 1));
+if (jsonAt >= 0) writeFileSync(args[jsonAt + 1], JSON.stringify({
+  file: `streg-${split}`, pass: valid.filter((c) => c.asIs).length, total: valid.length, goldOk, rows,
+  per: Object.fromEntries(valid.map((c) => [`${c.problem} ${c.q}`, c.asIs])),
+}, null, 1));
