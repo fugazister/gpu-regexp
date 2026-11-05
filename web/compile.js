@@ -40,6 +40,15 @@ function lookup(lex, text) {
   return best && !tied ? { entry: lex[best], form: best, exact: false } : null;
 }
 
+function numberWord(low, text, diagnostics) {
+  if (NUMBER_WORDS.has(low)) return NUMBER_WORDS.get(low);
+  if (low.length < 4) return undefined;
+  const near = [...NUMBER_WORDS.keys()].filter((w) => editDistance(low, w, 1) <= 1);
+  if (near.length !== 1) return undefined;
+  diagnostics.push(`read "${text}" as "${near[0]}"`);
+  return NUMBER_WORDS.get(near[0]);
+}
+
 /** Adjacent tokens with one role become a span. Quoted literals and numbers always stand alone. */
 function toSpans(tokens, roles) {
   const spans = [];
@@ -167,7 +176,7 @@ export function compile(tokens, roles, lex) {
     }
     if (role === "NUM") {
       const low = sp.text.toLowerCase();
-      const n = /^[0-9]+$/.test(low) ? Number(low) : NUMBER_WORDS.get(low);
+      const n = /^[0-9]+$/.test(low) ? Number(low) : numberWord(low, sp.text, diagnostics);
       if (n === undefined) {
         diagnostics.push(`"${sp.text}" was read as a number but isn't one, so it was matched as text`);
         return addLiteral(sp.text, sp);

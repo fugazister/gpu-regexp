@@ -456,12 +456,12 @@ class Gen:
               ("t_contains", 10), ("t_alt", 7), ("t_preset", 15), ("t_password", 2), ("t_capture", 3), ("t_ext", 1),
               ("t_digit_noun", 2)]
 
-    def typo(self, text):
+    def typo(self, text, min_len=5):
         """One edit in one long word, so the model learns that misspelt words keep their role."""
         ws = text.split(" ")
         i = self.r.randrange(len(ws))
         w = ws[i]
-        if len(w) < 5 or not w.isalpha():
+        if len(w) < min_len or not w.isalpha():
             return text
         j = self.r.randrange(1, len(w) - 1)
         k = self.r.randint(0, 2)
@@ -490,10 +490,16 @@ class Gen:
             if self.r.random() < 0.10:
                 i = self.r.randrange(len(segs))
                 t = segs[i]
-                if t[1] not in ("LIT", "NUM"):
-                    new = self.typo(t[0])
+                if t[1] != "LIT":
+                    new = self.typo(t[0], 4 if t[1] == "NUM" else 5)
                     has_typo = new != t[0]
                     segs[i] = (new, t[1], t[2])
+            spelled = [i for i, t in enumerate(segs) if t[1] == "NUM" and t[0].isalpha()]
+            if spelled and self.r.random() < 0.10:
+                i = self.c(spelled)
+                new = self.typo(segs[i][0], 4)
+                has_typo = has_typo or new != segs[i][0]
+                segs[i] = (new, segs[i][1], segs[i][2])
             if self.r.random() < 0.06 and segs[0][1] not in ("LIT", "NUM"):
                 segs[0] = (segs[0][0].capitalize(), segs[0][1], segs[0][2])
         return segs, rx, ("im" if icase else "m"), has_typo
