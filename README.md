@@ -50,10 +50,12 @@ Scored by behaviour: a prompt passes if its regex matches every string it should
 | Test set (201) | 169 (84.1%, 95% CI 78.4–88.5) |
 | Dev set (60) | 57 (95%) |
 | `natural` test prompts only (45) | 20 (44%) |
+| [StructuredRegex](https://github.com/xiye17/StructuredRegex), written by other people (996 across two test splits) | 20 (2.0%) |
+| StructuredRegex, only regexes the grammar could express (159) | 9 (5.7%) |
 
-Read these with care. One author wrote all the prompts and the grammar, so the test set isn't independent, and real users' phrasing would probably score lower. The `natural` row is the closest thing here to real use. The checks are also lenient: a prompt can pass with a regex that's broader than it should be.
+Read these with care. One author wrote the first three sets and the grammar, so they aren't independent. StructuredRegex is independent, and much harder than typing a short prompt: its descriptions are long and formal, and most describe regexes this project can't express. The real answer on everyday phrasing is somewhere in between. The checks are also lenient: a prompt can pass with a regex that's broader than it should be.
 
-**[EXPERIMENTS.md](EXPERIMENTS.md)** explains how better training data took the test score from 80% to 84%, what didn't improve, and how sure we can be.
+**[EXPERIMENTS.md](EXPERIMENTS.md)** explains how better training data took the test score from 80% to 84%, what didn't improve, why the independent score is so low, and how sure we can be.
 
 An earlier comparison with a seq2seq transformer, on a smaller test set (40 prompts) that has since been retired:
 
