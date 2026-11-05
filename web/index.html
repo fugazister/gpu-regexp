@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gpu-regexp</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: light-dark(#f6f5f1, #14151a);
+    --panel: light-dark(#ffffff, #1d1f26);
+    --ink: light-dark(#1b1c20, #ecebe6);
+    --muted: light-dark(#696b73, #9598a3);
+    --line: light-dark(#dddcd5, #30323c);
+    --accent: light-dark(#0a7d55, #4fd6a3);
+    --hit: light-dark(#ffe28a, #6b5410);
+    --warn: light-dark(#8a5a00, #f0bc5e);
+    --err: light-dark(#b3261e, #ff8a80);
+    --c-atom: light-dark(#d7eee3, #1d4536);
+    --c-lit: light-dark(#fbe5c8, #553b16);
+    --c-quant: light-dark(#dbe4fb, #25335c);
+    --c-struct: light-dark(#efdcf5, #47285a);
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 16px 64px; }
+  h1 { font: 700 26px var(--mono); margin: 0; letter-spacing: -.02em; }
+  .sub { color: var(--muted); margin: 4px 0 28px; }
+  label, .label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin: 22px 0 6px; }
+  input, textarea, select {
+    width: 100%; padding: 12px 14px; font: inherit; color: inherit; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 8px;
+  }
+  input:focus-visible, textarea:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #q { font-size: 18px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  button {
+    font: inherit; font-size: 13px; color: inherit; background: transparent; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px;
+  }
+  button:hover { border-color: var(--accent); }
+  .result {
+    display: flex; align-items: flex-start; gap: 12px; padding: 14px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 8px; min-height: 52px;
+  }
+  #re { flex: 1; min-width: 0; font: 15px/1.5 var(--mono); overflow-wrap: anywhere; color: var(--accent); }
+  #re.bad { color: var(--err); }
+  #spans { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+  .span { display: inline-flex; flex-direction: column; padding: 2px 7px; border-radius: 5px; font-size: 14px; line-height: 1.3; }
+  .span small { font: 10px var(--mono); color: var(--muted); }
+  .span.O { color: var(--muted); padding-inline: 3px; }
+  .span.atom { background: var(--c-atom); }
+  .span.lit { background: var(--c-lit); }
+  .span.quant { background: var(--c-quant); }
+  .span.struct { background: var(--c-struct); }
+  #diag { margin: 8px 0 0; padding: 0; list-style: none; font-size: 14px; color: var(--warn); }
+  #view {
+    white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.6 var(--mono); padding: 12px 14px; min-height: 48px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-top: 8px;
+  }
+  textarea { font: 14px/1.6 var(--mono); resize: vertical; }
+  mark { background: var(--hit); color: inherit; border-radius: 2px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .row select { width: auto; padding: 3px 6px; font-size: 13px; }
+  #status { flex: 1; min-width: 200px; }
+  table { border-collapse: collapse; font: 13px var(--mono); margin-top: 8px; width: 100%; }
+  th, td { padding: 3px 12px 3px 0; text-align: right; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; }
+  footer { margin-top: 36px; border-top: 1px solid var(--line); padding-top: 14px; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>gpu-regexp</h1>
+  <p class="sub">Describe a pattern in English. A tiny model labels your words, and a compiler turns the labels into a regex.</p>
+
+  <label for="q">What do you want to match?</label>
+  <input id="q" autocomplete="off" spellcheck="false" value="starts with a capital letter and ends with a period">
+  <div class="chips" id="examples"></div>
+
+  <div class="label">Regex</div>
+  <div class="result"><code id="re" aria-live="polite">loading model…</code><button id="copy">Copy</button></div>
+  <ul id="diag"></ul>
+
+  <div class="label">How your words were read</div>
+  <div id="spans"></div>
+  <div class="row">
+    <span id="status"></span>
+    <label for="backend" style="margin:0">Run on</label>
+    <select id="backend"><option value="auto">Auto</option><option value="cpu">CPU</option><option value="webgpu">WebGPU</option></select>
+  </div>
+
+  <label for="text">Try it on</label>
+  <textarea id="text" rows="4" spellcheck="false">Hello there.
+not this one.
+Nor this one
+Regexes are a solved problem.</textarea>
+  <div id="view"></div>
+
+  <div class="label">Why is it on the CPU?</div>
+  <p style="margin:0;font-size:14px">One short prompt is faster on the CPU, because the trip to the GPU and back costs more than it saves. The GPU wins on large batches. Measure it on this device:</p>
+  <div class="row"><button id="bench">Compare CPU and GPU</button></div>
+  <div id="benchOut"></div>
+
+  <footer>Inspired by <a href="https://shud.in/thoughts/ideas-behind-gpu-lexer">gpu-lexer</a> and its descendants. Runs entirely in your browser. Check the regex before you ship it.</footer>
+</main>
+<script type="module">
+import { load } from "./gpu-regexp.js";
+import { tokenize } from "./features.js";
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+const KIND = (role) => role === "O" ? "O" : role === "ATOM" ? "atom" : role === "LIT" ? "lit"
+  : role === "NUM" || role.startsWith("Q_") ? "quant" : "struct";
+
+const EXAMPLES = ["email address", "three digits then a dash", "lines not containing error", "words ending in ing",
+  "password with at least 8 characters and one digit", "either cat or dog", "only lowercase letters", "digts folowed by a dash"];
+for (const ex of EXAMPLES) $("examples").append(el("button", { textContent: ex, onclick: () => { $("q").value = ex; run(); } }));
+
+let parser, current = null, latest = 0;
+
+function paint() {
+  const view = $("view"), text = $("text").value;
+  view.replaceChildren();
+  if (!current) { view.textContent = text; return; }
+  let at = 0;
+  for (const m of text.matchAll(new RegExp(current.source, current.flags + "g"))) {
+    if (!m[0].length) continue;
+    view.append(text.slice(at, m.index), el("mark", { textContent: m[0] }));
+    at = m.index + m[0].length;
+  }
+  view.append(text.slice(at));
+}
+
+async function run() {
+  if (!parser) return;
+  const ticket = ++latest, t0 = performance.now(), choice = $("backend").value;
+  let r;
+  try { r = await parser.parse($("q").value, { backend: choice }); }
+  catch (e) {
+    $("re").className = "bad";
+    $("re").textContent = e.message;
+    return;
+  }
+  if (ticket !== latest) return; // a newer keystroke superseded this result
+  const ms = performance.now() - t0;
+  $("re").className = r.source === null ? "bad" : "";
+  $("re").textContent = r.source === null ? (r.tokens.length ? "couldn't build a regex from that" : "—") : `/${r.source}/${r.flags}`;
+  $("diag").replaceChildren(...r.diagnostics.map((d) => el("li", { textContent: d })));
+  $("spans").replaceChildren(...r.spans.map((s) => el("span", { className: `span ${KIND(s.role)}` },
+    s.text, ...(s.role === "O" ? [] : [el("small", { textContent: s.role })]))));
+  current = r.regexp ? r : null;
+  paint();
+  const pct = Math.round(r.confidence * 100);
+  $("status").textContent = `${r.backend === "webgpu" ? `WebGPU (${parser.backends.webgpu.adapter})` : "CPU"} · ${ms.toFixed(1)} ms · ` +
+    `${pct}% sure of its least sure word · ${(parser.modelBytes / 1024).toFixed(0)} kB model`;
+}
+
+$("q").oninput = run;
+$("backend").onchange = run;
+$("text").oninput = paint;
+$("copy").onclick = async () => {
+  if (!current) return;
+  await navigator.clipboard.writeText(current.source);
+  $("copy").textContent = "Copied";
+  setTimeout(() => { $("copy").textContent = "Copy"; }, 1200);
+};
+$("bench").onclick = async () => {
+  const b = $("bench");
+  b.disabled = true;
+  const prompts = [$("q").value, ...EXAMPLES].map((p) => tokenize(p).slice(0, 48)).filter((p) => p.length);
+  const rows = [];
+  for (const n of [1, 32, 256, 1024]) {
+    b.textContent = `Running ${n}…`;
+    const batch = Array.from({ length: n }, (_, i) => prompts[i % prompts.length]);
+    const time = async (backend) => {
+      if (!backend) return null;
+      await parser.tag(batch, backend);
+      let best = Infinity;
+      for (let k = 0; k < 3; k++) { const t = performance.now(); await parser.tag(batch, backend); best = Math.min(best, performance.now() - t); }
+      return best;
+    };
+    const cpu = await time(parser.backends.cpu), gpu = await time(parser.backends.webgpu);
+    rows.push(el("tr", {}, el("td", { textContent: n }), el("td", { textContent: cpu.toFixed(1) + " ms" }),
+      el("td", { textContent: gpu === null ? "n/a" : gpu.toFixed(1) + " ms" })));
+  }
+  $("benchOut").replaceChildren(el("table", {},
+    el("tr", {}, el("th", { textContent: "Prompts" }), el("th", { textContent: "CPU" }), el("th", { textContent: "WebGPU" })), ...rows));
+  b.textContent = "Compare CPU and GPU";
+  b.disabled = false;
+};
+
+try {
+  parser = await load();
+  if (!parser.backends.webgpu) {
+    $("backend").querySelector('[value="webgpu"]').disabled = true;
+    $("bench").title = parser.gpuError ?? "";
+  }
+  run();
+} catch (e) {
+  $("re").className = "bad";
+  $("re").textContent = "could not load the model: " + e.message;
+}
+paint();
+</script>
+</body>
+</html>

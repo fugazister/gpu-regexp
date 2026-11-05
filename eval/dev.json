@@ -1,0 +1,22 @@
+[
+  {"q": "three digits", "yes": ["123"], "no": ["12", "abc"]},
+  {"q": "a line that starts with foo", "yes": ["foo bar"], "no": ["bar foo"]},
+  {"q": "email address", "yes": ["me@example.com"], "no": ["not an email"]},
+  {"q": "only letters", "yes": ["abc"], "no": ["ab1", ""]},
+  {"q": "cat or dog", "yes": ["my cat", "a dog"], "no": ["bird"]},
+  {"q": "ends with .png", "yes": ["a.png"], "no": ["a.jpg", "apng"]},
+  {"q": "between 2 and 4 uppercase letters", "yes": ["AB", "ABCD"], "no": ["a", "1"]},
+  {"q": "words starting with un", "yes": ["undo it"], "no": ["sun", "bad"]},
+  {"q": "lines not containing error", "yes": ["all fine"], "no": ["an error here"]},
+  {"q": "password with at least 8 characters and one digit", "yes": ["abcdefg1"], "no": ["abcdefgh", "a1"]},
+  {"q": "a date like yyyy-mm-dd", "yes": ["2024-01-31"], "no": ["01/31/2024"]},
+  {"q": "hex color", "yes": ["#ff00aa", "#fff"], "no": ["ff00aa", "#xyz"]},
+  {"q": "one or more digits followed by a dot", "yes": ["12."], "no": ["12", "."]},
+  {"q": "regex for ip addresses", "yes": ["192.168.0.1"], "no": ["hello"]},
+  {"q": "blank lines", "yes": ["", "   "], "no": ["x"]},
+  {"q": "starts with a capital letter and ends with a period", "yes": ["Hello."], "no": ["hello.", "Hello"]},
+  {"q": "5 digit zip code", "yes": ["12345"], "no": ["1234"]},
+  {"q": "the word hello case insensitive", "yes": ["HELLO there"], "no": ["othello"]},
+  {"q": "anything except commas", "yes": ["abc"], "no": []},
+  {"q": "an optional dash then 4 digits", "yes": ["-1234", "1234"], "no": ["12"]}
+]
