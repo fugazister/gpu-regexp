@@ -27,6 +27,8 @@ PREFIXES = ["", "", "", "", "", "match", "matches", "find", "a regex for", "rege
 NOISE = ("the a an any my our this that in of for to it please like kind sort thing things stuff text value "
          "values string strings input really basically simply actually valid so also which is are there can be "
          "from at on by must should my your").split()
+# Short everyday words people use as literals, even though the grammar also uses some of them.
+PLAIN_LITS = "yes no on off in out up down start stop end true false get set new old first last left right top bottom open close none".split()
 SUBJECT = ["string", "strings", "line", "lines", "text", "input", "value", "values", "anything", "something",
            "any line", "any string", "a line", "a string", "the string", "the line", "a value"]
 
@@ -71,9 +73,14 @@ class Gen:
             w = w.capitalize()
         return w
 
-    def lit_seg(self, w):
-        bare_ok = self.fixed is not None and " " not in w and not w.isdigit() and all(
-            t["text"].lower() not in self.fixed for t in tokenize(w))
+    def lit_seg(self, w, loose=False):
+        """Bare literals normally avoid every grammar word. loose only avoids atoms and numbers, for
+        positions where context shows it's a literal ("yes or no"), so those words get seen as LIT."""
+        if loose:
+            clash = lambda t: compact(t) in LEX or t.lower() in NUM_WORDS
+        else:
+            clash = lambda t: t.lower() in self.fixed
+        bare_ok = self.fixed is not None and " " not in w and not w.isdigit() and not any(clash(t["text"]) for t in tokenize(w))
         if bare_ok and self.r.random() < 0.7:
             return S(w, "LIT")
         q = self.c(['"', '"', '"', "'", "`"])
@@ -193,8 +200,8 @@ class Gen:
         return [A1, S("-", "Q_RANGE", True), S(B1[0], "NUM", True), P], src + q
 
     def lit_element(self):
-        w = self.lit_word()
-        L = self.lit_seg(w)
+        w = self.c(PLAIN_LITS) if self.r.random() < 0.15 else self.lit_word()
+        L = self.lit_seg(w, loose=True)
         e = esc(w)
         k = self.r.random()
         if k < 0.48:
@@ -332,7 +339,7 @@ class Gen:
 
     def t_word_affix(self):
         w = self.lit_word()
-        L, e = self.lit_seg(w), esc(w)
+        L, e = self.lit_seg(w, loose=True), esc(w)
         wd = S(self.c(["word", "words", "any word", "a word", "all words"]), "WORDS")
         k = self.r.random()
         if k < 0.35:
@@ -358,8 +365,9 @@ class Gen:
 
     def t_alt(self):
         n = self.r.randint(2, 4)
-        ws = [self.lit_word() for _ in range(n)]
-        Ls = [self.lit_seg(w) for w in ws]
+        plain = self.r.random() < 0.4
+        ws = [self.c(PLAIN_LITS) if plain else self.lit_word() for _ in range(n)]
+        Ls = [self.lit_seg(w, loose=True) for w in ws]
         body = "|".join(esc(w) for w in ws)
         comma_style = self.r.random() < 0.5
         segs = []
