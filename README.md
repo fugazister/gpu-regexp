@@ -74,12 +74,12 @@ Tagging only, median of 7 warm runs, RTX 4060 through Dawn in Node. Prompts are 
 
 | Prompts | CPU | WebGPU | Speedup |
 |---:|---:|---:|---:|
-| 1 | 0.2 ms | 1.2 ms | 0.2× |
-| 32 | 12.6 ms | 2.2 ms | 5.7× |
-| 256 | 133 ms | 8.2 ms | 16× |
-| 1,024 | 530 ms | 69 ms | 7.7× |
-| 4,096 | 2,113 ms | 145 ms | 15× |
-| 16,384 | 8,724 ms | 649 ms | 13× |
+| 1 | 0.2 ms | 1.3 ms | 0.2× |
+| 32 | 12.8 ms | 2.2 ms | 5.8× |
+| 256 | 100 ms | 7.7 ms | 13× |
+| 1,024 | 406 ms | 49 ms | 8.3× |
+| 4,096 | 1,617 ms | 129 ms | 13× |
+| 16,384 | 6,533 ms | 579 ms | 11× |
 
 A single prompt is faster on the CPU, so the demo normally types on the CPU despite the name. This is one machine, not a cross-device benchmark. The page's **Compare CPU and GPU** button measures yours.
 

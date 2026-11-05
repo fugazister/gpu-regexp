@@ -204,9 +204,9 @@ The lesson is the one from `natural`, at larger scale: a model scored on prompts
 - **The gain held on data it never saw.** The fix came from reading `dev`, so `dev` alone would flatter it. E5 → E6 on `teste` was 9 gained, 1 lost (seed 1) and 4 gained, 1 lost (seed 2). On `testi` it was 23 gained, 1 lost and 19 gained, 3 lost. The p-values treat descriptions as independent, so they're somewhat too small; three of the four are below 0.05, and seed 2 on `teste` isn't (p=0.375).
 - **It costs little on the old set.** The own test set moved by 1 to 2 prompts (p=0.69 and p=1.0), which is within noise, though it's in the wrong direction.
 - **E6-s1 was picked before seeing the frozen splits,** because it scored higher on `dev` (22 vs 20). Averaging the seeds, 42.5/996 (4.3%) is the fairer estimate.
-- **Fixing the training data can make overconfidence worse.** `asdf qwer zxcv` went from `/asdfzxcv/` at .48 to `/zxcv/` at 1.00. More filler in training means the model drops unknown words more readily and sounds surer doing it.
+- **Fixing the training data can make overconfidence worse.** `asdf qwer zxcv` went from `/asdfzxcv/` at .48 to `/zxcv/` at 1.00. One possible cause, not tested: more filler in training could make the model drop unknown words more readily.
 
-**A mistake and what it showed:** A shell bug ran the first two "seeds" both with seed 1. A true seed 2 replaced it, and the accident became a useful measurement. **The same seed doesn't reproduce exactly:** the repeat flipped 2 prompts on StructuredRegex `dev` and 3 on the own test set, because training workers feed batches in an unpredictable order. Part of what these logs call seed variance is this. The repeat's scores are in `results/E6-s1-repeat.*`.
+**A mistake and what it showed:** A shell bug ran the first two "seeds" both with seed 1. A true seed 2 replaced it, and the accident became a useful measurement. **The same seed doesn't reproduce exactly:** the repeat flipped 2 prompts on StructuredRegex `dev` and 3 on the own test set, probably because training workers feed batches in an unpredictable order, though GPU nondeterminism is also possible. Either way, part of what these logs call seed variance is really this. The repeat's scores are in `results/E6-s1-repeat.*`.
 
 ### How far could the score go?
 
