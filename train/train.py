@@ -8,8 +8,10 @@ import multiprocessing as mp
 import os
 import random
 import sys
+import resource
 import time
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 
@@ -19,22 +21,27 @@ from grammar import MAX_TOKENS, ROLES, Gen, build_fixed
 from model import ScanTagger
 
 ROLE_ID = {r: i for i, r in enumerate(ROLES)}
-_w = {}
+MAX_RSS_GB = 6  # abort rather than pressure a shared machine
 
 
-def _init(fixed, seed):
-    _w["g"] = Gen(random.Random(seed + os.getpid()), fixed=fixed)
-
-
-def _batch(n):
-    rows, labels, lengths = [], [], []
-    for _ in range(n):
-        s = _w["g"].sample()
-        f = [featurize(t) for t in tokenize(s["text"])]
-        lengths.append(len(f))
-        rows.append(f + [[0] * SLOTS] * (MAX_TOKENS - len(f)))
-        labels.append([ROLE_ID[r] for r in s["roles"]] + [-100] * (MAX_TOKENS - len(f)))
+def make_batch(g, n):
+    rows = np.zeros((n, MAX_TOKENS, SLOTS), dtype=np.int16)
+    labels = np.full((n, MAX_TOKENS), -100, dtype=np.int8)
+    lengths = np.zeros(n, dtype=np.int16)
+    for b in range(n):
+        s = g.sample()
+        toks = tokenize(s["text"])
+        lengths[b] = len(toks)
+        rows[b, : len(toks)] = [featurize(t) for t in toks]
+        labels[b, : len(toks)] = [ROLE_ID[r] for r in s["roles"]]
     return rows, labels, lengths
+
+
+def worker(q, fixed, seed, n):
+    """put() blocks while the bounded queue is full, so workers can't outrun training."""
+    g = Gen(random.Random(seed), fixed=fixed)
+    while True:
+        q.put(make_batch(g, n))
 
 
 def main():
@@ -61,18 +68,21 @@ def main():
     opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, a.lr, total_steps=a.steps, pct_start=0.05)
 
-    pool = mp.Pool(a.workers, _init, (fixed, a.seed))
-    batches = pool.imap(_batch, (a.bs for _ in range(a.steps)), chunksize=4)
+    q = mp.Queue(maxsize=2 * a.workers)
+    procs = [mp.Process(target=worker, args=(q, fixed, a.seed * 1000 + i, a.bs), daemon=True) for i in range(a.workers)]
+    for p in procs:
+        p.start()
 
     def save():
         torch.save(dict(state=model.state_dict(), cfg=model.cfg, roles=ROLES), f"{a.out}/tagger.pt")
 
     t0, ema = time.time(), None
-    for step, (rows, labels, lengths) in enumerate(batches, 1):
-        L = max(lengths)
-        rows = torch.tensor(rows, device=a.device)[:, :L]
-        labels = torch.tensor(labels, device=a.device)[:, :L]
-        lengths = torch.tensor(lengths, device=a.device)
+    for step in range(1, a.steps + 1):
+        rows, labels, lengths = q.get()
+        L = int(lengths.max())
+        rows = torch.from_numpy(rows[:, :L].astype(np.int64)).to(a.device)
+        labels = torch.from_numpy(labels[:, :L].astype(np.int64)).to(a.device)
+        lengths = torch.from_numpy(lengths.astype(np.int64)).to(a.device)
         logits = model(rows, lengths)
         loss = F.cross_entropy(logits.reshape(-1, logits.shape[-1]), labels.reshape(-1), ignore_index=-100)
         opt.zero_grad(set_to_none=True)
@@ -84,9 +94,13 @@ def main():
         if step % 500 == 0 or step == a.steps:
             pred = logits.argmax(-1)
             ok = ((pred == labels) | (labels == -100)).all(1).float().mean().item()
-            print(f"step {step}/{a.steps} loss {ema:.4f} seq_acc {ok:.3f} {step / (time.time() - t0):.1f} it/s", flush=True)
+            rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024**2
+            print(f"step {step}/{a.steps} loss {ema:.4f} seq_acc {ok:.3f} {step / (time.time() - t0):.1f} it/s peak_rss {rss:.2f}GB", flush=True)
             save()
-    pool.terminate()
+            if rss > MAX_RSS_GB:
+                raise SystemExit(f"peak RSS {rss:.1f}GB is over the {MAX_RSS_GB}GB guard, stopping")
+    for p in procs:
+        p.terminate()
     save()
     with open(f"{a.out}/done.json", "w") as f:
         json.dump(dict(steps=a.steps, seconds=time.time() - t0, loss=ema, **model.cfg), f)
