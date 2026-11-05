@@ -1,0 +1,402 @@
+{
+ "E0-s1": [
+  {
+   "prompt": "only letters",
+   "word": "only",
+   "role": "ONLY",
+   "target": "E1",
+   "p": 0.647,
+   "top": "ONLY"
+  },
+  {
+   "prompt": "either yes or no",
+   "word": "no",
+   "role": "LIT",
+   "target": "E2",
+   "p": 0.003,
+   "top": "NEG"
+  },
+  {
+   "prompt": "thre digits",
+   "word": "thre",
+   "role": "NUM",
+   "target": "E3",
+   "p": 0.0,
+   "top": "O"
+  },
+  {
+   "prompt": "time in hh:mm format",
+   "word": "format",
+   "role": "O",
+   "target": "E4",
+   "p": 0.0,
+   "top": "ATOM"
+  },
+  {
+   "prompt": "version number like 1.2.3",
+   "word": "like",
+   "role": "O",
+   "target": "E4",
+   "p": 1.0,
+   "top": "O"
+  },
+  {
+   "prompt": "a vowel followed by two consonants",
+   "word": "consonants",
+   "role": "ATOM",
+   "target": "E5",
+   "p": 0.0,
+   "top": "O"
+  }
+ ],
+ "E0-s2": [
+  {
+   "prompt": "only letters",
+   "word": "only",
+   "role": "ONLY",
+   "target": "E1",
+   "p": 0.947,
+   "top": "ONLY"
+  },
+  {
+   "prompt": "either yes or no",
+   "word": "no",
+   "role": "LIT",
+   "target": "E2",
+   "p": 0.984,
+   "top": "LIT"
+  },
+  {
+   "prompt": "thre digits",
+   "word": "thre",
+   "role": "NUM",
+   "target": "E3",
+   "p": 0.017,
+   "top": "ATOM"
+  },
+  {
+   "prompt": "time in hh:mm format",
+   "word": "format",
+   "role": "O",
+   "target": "E4",
+   "p": 0.0,
+   "top": "ATOM"
+  },
+  {
+   "prompt": "version number like 1.2.3",
+   "word": "like",
+   "role": "O",
+   "target": "E4",
+   "p": 1.0,
+   "top": "O"
+  },
+  {
+   "prompt": "a vowel followed by two consonants",
+   "word": "consonants",
+   "role": "ATOM",
+   "target": "E5",
+   "p": 0.739,
+   "top": "ATOM"
+  }
+ ],
+ "E1": [
+  {
+   "prompt": "only letters",
+   "word": "only",
+   "role": "ONLY",
+   "target": "E1",
+   "p": 1.0,
+   "top": "ONLY"
+  },
+  {
+   "prompt": "either yes or no",
+   "word": "no",
+   "role": "LIT",
+   "target": "E2",
+   "p": 0.243,
+   "top": "NEG"
+  },
+  {
+   "prompt": "thre digits",
+   "word": "thre",
+   "role": "NUM",
+   "target": "E3",
+   "p": 0.0,
+   "top": "O"
+  },
+  {
+   "prompt": "time in hh:mm format",
+   "word": "format",
+   "role": "O",
+   "target": "E4",
+   "p": 0.0,
+   "top": "ATOM"
+  },
+  {
+   "prompt": "version number like 1.2.3",
+   "word": "like",
+   "role": "O",
+   "target": "E4",
+   "p": 1.0,
+   "top": "O"
+  },
+  {
+   "prompt": "a vowel followed by two consonants",
+   "word": "consonants",
+   "role": "ATOM",
+   "target": "E5",
+   "p": 0.008,
+   "top": "O"
+  }
+ ],
+ "E2": [
+  {
+   "prompt": "only letters",
+   "word": "only",
+   "role": "ONLY",
+   "target": "E1",
+   "p": 1.0,
+   "top": "ONLY"
+  },
+  {
+   "prompt": "either yes or no",
+   "word": "no",
+   "role": "LIT",
+   "target": "E2",
+   "p": 1.0,
+   "top": "LIT"
+  },
+  {
+   "prompt": "thre digits",
+   "word": "thre",
+   "role": "NUM",
+   "target": "E3",
+   "p": 0.009,
+   "top": "O"
+  },
+  {
+   "prompt": "time in hh:mm format",
+   "word": "format",
+   "role": "O",
+   "target": "E4",
+   "p": 0.007,
+   "top": "ATOM"
+  },
+  {
+   "prompt": "version number like 1.2.3",
+   "word": "like",
+   "role": "O",
+   "target": "E4",
+   "p": 1.0,
+   "top": "O"
+  },
+  {
+   "prompt": "a vowel followed by two consonants",
+   "word": "consonants",
+   "role": "ATOM",
+   "target": "E5",
+   "p": 0.99,
+   "top": "ATOM"
+  }
+ ],
+ "E3": [
+  {
+   "prompt": "only letters",
+   "word": "only",
+   "role": "ONLY",
+   "target": "E1",
+   "p": 1.0,
+   "top": "ONLY"
+  },
+  {
+   "prompt": "either yes or no",
+   "word": "no",
+   "role": "LIT",
+   "target": "E2",
+   "p": 1.0,
+   "top": "LIT"
+  },
+  {
+   "prompt": "thre digits",
+   "word": "thre",
+   "role": "NUM",
+   "target": "E3",
+   "p": 0.985,
+   "top": "NUM"
+  },
+  {
+   "prompt": "time in hh:mm format",
+   "word": "format",
+   "role": "O",
+   "target": "E4",
+   "p": 0.001,
+   "top": "ATOM"
+  },
+  {
+   "prompt": "version number like 1.2.3",
+   "word": "like",
+   "role": "O",
+   "target": "E4",
+   "p": 1.0,
+   "top": "O"
+  },
+  {
+   "prompt": "a vowel followed by two consonants",
+   "word": "consonants",
+   "role": "ATOM",
+   "target": "E5",
+   "p": 0.998,
+   "top": "ATOM"
+  }
+ ],
+ "E4": [
+  {
+   "prompt": "only letters",
+   "word": "only",
+   "role": "ONLY",
+   "target": "E1",
+   "p": 1.0,
+   "top": "ONLY"
+  },
+  {
+   "prompt": "either yes or no",
+   "word": "no",
+   "role": "LIT",
+   "target": "E2",
+   "p": 1.0,
+   "top": "LIT"
+  },
+  {
+   "prompt": "thre digits",
+   "word": "thre",
+   "role": "NUM",
+   "target": "E3",
+   "p": 0.998,
+   "top": "NUM"
+  },
+  {
+   "prompt": "time in hh:mm format",
+   "word": "format",
+   "role": "O",
+   "target": "E4",
+   "p": 1.0,
+   "top": "O"
+  },
+  {
+   "prompt": "version number like 1.2.3",
+   "word": "like",
+   "role": "O",
+   "target": "E4",
+   "p": 1.0,
+   "top": "O"
+  },
+  {
+   "prompt": "a vowel followed by two consonants",
+   "word": "consonants",
+   "role": "ATOM",
+   "target": "E5",
+   "p": 0.67,
+   "top": "ATOM"
+  }
+ ],
+ "E5-s1": [
+  {
+   "prompt": "only letters",
+   "word": "only",
+   "role": "ONLY",
+   "target": "E1",
+   "p": 1.0,
+   "top": "ONLY"
+  },
+  {
+   "prompt": "either yes or no",
+   "word": "no",
+   "role": "LIT",
+   "target": "E2",
+   "p": 1.0,
+   "top": "LIT"
+  },
+  {
+   "prompt": "thre digits",
+   "word": "thre",
+   "role": "NUM",
+   "target": "E3",
+   "p": 0.99,
+   "top": "NUM"
+  },
+  {
+   "prompt": "time in hh:mm format",
+   "word": "format",
+   "role": "O",
+   "target": "E4",
+   "p": 1.0,
+   "top": "O"
+  },
+  {
+   "prompt": "version number like 1.2.3",
+   "word": "like",
+   "role": "O",
+   "target": "E4",
+   "p": 1.0,
+   "top": "O"
+  },
+  {
+   "prompt": "a vowel followed by two consonants",
+   "word": "consonants",
+   "role": "ATOM",
+   "target": "E5",
+   "p": 1.0,
+   "top": "ATOM"
+  }
+ ],
+ "E5-s2": [
+  {
+   "prompt": "only letters",
+   "word": "only",
+   "role": "ONLY",
+   "target": "E1",
+   "p": 1.0,
+   "top": "ONLY"
+  },
+  {
+   "prompt": "either yes or no",
+   "word": "no",
+   "role": "LIT",
+   "target": "E2",
+   "p": 1.0,
+   "top": "LIT"
+  },
+  {
+   "prompt": "thre digits",
+   "word": "thre",
+   "role": "NUM",
+   "target": "E3",
+   "p": 0.982,
+   "top": "NUM"
+  },
+  {
+   "prompt": "time in hh:mm format",
+   "word": "format",
+   "role": "O",
+   "target": "E4",
+   "p": 1.0,
+   "top": "O"
+  },
+  {
+   "prompt": "version number like 1.2.3",
+   "word": "like",
+   "role": "O",
+   "target": "E4",
+   "p": 1.0,
+   "top": "O"
+  },
+  {
+   "prompt": "a vowel followed by two consonants",
+   "word": "consonants",
+   "role": "ATOM",
+   "target": "E5",
+   "p": 1.0,
+   "top": "ATOM"
+  }
+ ]
+}

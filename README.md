@@ -37,27 +37,38 @@ await gr.parseMany(prompts); // batches; uses WebGPU from 32 prompts up
 
 1. **Tokenize and featurize (CPU).** Each token becomes six hashed features: word, consonant skeleton, prefix, suffix, shape and length. With no vocabulary, `digts` still lands near `digits`.
 2. **Tag (WebGPU or CPU).** Summed embeddings, two layers of gated bidirectional scans, a 5-tap convolution, and a two-layer head. Weights are int6, trained with fake quantization.
-3. **Compile (CPU).** `web/compile.js` holds all the regex semantics. A 385-form lexicon decides what an `ATOM` span means, tolerating small typos. The model never writes regex text, so its mistakes produce a wrong regex, not an invalid one.
+3. **Compile (CPU).** `web/compile.js` holds all the regex semantics. A 387-form lexicon decides what an `ATOM` span means, tolerating small typos. The model never writes regex text, so its mistakes produce a wrong regex, not an invalid one.
 
 Training data comes from a grammar (`train/grammar.py`) that emits labels and a gold regex built independently of the compiler.
 
 ## Results
 
-Scored by behaviour: a prompt passes if its regex matches every string it should and none it shouldn't. Prompts are hand-written. `eval/test.json` was written before seeing any model output and was run once.
+Scored by behaviour: a prompt passes if its regex matches every string it should and none it shouldn't.
+
+| Prompts | Passed |
+|---|---:|
+| Test set (201) | 169 (84.1%, 95% CI 78.4–88.5) |
+| Dev set (60) | 57 (95%) |
+| `natural` test prompts only (45) | 20 (44%) |
+
+Read these with care. One author wrote all the prompts and the grammar, so the test set isn't independent, and real users' phrasing would probably score lower. The `natural` row is the closest thing here to real use. The checks are also lenient: a prompt can pass with a regex that's broader than it should be.
+
+**[EXPERIMENTS.md](EXPERIMENTS.md)** explains how better training data took the test score from 80% to 84%, what didn't improve, and how sure we can be.
+
+An earlier comparison with a seq2seq transformer, on a smaller test set (40 prompts) that has since been retired:
 
 | | Tagger + compiler (this repo) | Seq2seq transformer (first attempt, not in this repo) |
 |---|---|---|
 | Parameters | 44,140 | 213,751 |
-| Weights | 43 kB (29 kB gzipped) | 209 kB |
-| Dev prompts (20) | 19 (95%) | 17 (85%) |
-| Held-out test prompts (40) | 34 (85%) | 30 (75%) |
-| Invalid regexes on the test set | 0 | 3 |
+| Weights | 43 kB (28 kB gzipped) | 209 kB |
+| Held-out test prompts (40), at the time | 34 (85%) | 30 (75%) |
+| Invalid regexes on that test set | 0 | 3 |
 
-Read these with care. Forty prompts by one author is a small sample, and the gap between the two models is only four prompts. The checks are also lenient: `a word that has exactly five letters` passes with `\w*[a-zA-Z]{5}\w*`, which also matches longer words. These numbers do not establish accuracy on real users' phrasing.
+The gap between the two is only four prompts, so this is weak evidence on its own.
 
 ### Speed
 
-Tagging only, median of 7 warm runs, RTX 4060 through Dawn in Node. Prompts are 86 fixtures repeated to fill the batch. CPU is the JS backend on the same machine.
+Tagging only, median of 7 warm runs, RTX 4060 through Dawn in Node. Prompts are 86 fixtures repeated to fill the batch. CPU is the JS backend on the same machine. Measured on the previous weights; the architecture and size haven't changed.
 
 | Prompts | CPU | WebGPU | Speedup |
 |---:|---:|---:|---:|
@@ -72,10 +83,12 @@ A single prompt is faster on the CPU, so the demo normally types on the CPU desp
 
 ## Limitations
 
-- **Coverage is the grammar and lexicon.** Consonants, thousands separators and group repetition (`(ab){3}`) aren't supported.
-- **Words it doesn't know can land in the regex.** `numbers with commas as thousands separators` gives `\d+,+(?:thousands separators)+`, and `a filename with no spaces` gives `filename[^ ]*`.
-- **Mistakes can be silent.** `either yes or no` drops the `no` and gives `/yes/`. `thre digits` loses the count and gives `\d+`. Gibberish like `asdf qwer zxcv` still produces a regex, though with low confidence. Diagnostics only cover what the compiler can detect.
-- **Fuzzy matching only helps words tagged as atoms.** In `digts folowed by a dahs`, `dahs` is copied as literal text.
+- **Natural phrasing often fails.** Only 44% of the `natural` test prompts pass, and better training data didn't change that.
+- **Coverage is the grammar and lexicon.** Thousands separators and group repetition (`(ab){3}`) aren't supported.
+- **Words it doesn't know can land in the regex.** `numbers with commas as thousands separators` gives `\d+commas as thousands`, and `a filename with no spaces` gives `filename[^ ]*`.
+- **It doesn't refuse, and confidence can't be trusted.** `the quick brown fox` gives `/brown/` at confidence .99, and `asdf qwer zxcv` gives `/asdfzxcv/` at .48. Diagnostics only cover what the compiler can detect.
+- **Mistakes can be silent.** `a string of exactly ten digits` loses the count and gives `\d+`.
+- **Fuzzy matching doesn't catch everything.** In `digts folowed by a dahs`, `dahs` is copied as literal text.
 - **Presets are opinionated approximations**, such as email and URL. Generated patterns aren't checked for catastrophic backtracking, so don't run them on untrusted input without review.
 - The tokenizers can differ on unusual non-ASCII text; parity is tested on the generated prompts and a few handwritten edge cases, which are mostly ASCII.
 
@@ -94,11 +107,15 @@ train/.venv/bin/python train/dump_oracle.py   # web/lexicon.json, eval/oracle.js
 node eval/roundtrip.mjs            # compiler on gold labels: MUST be 100%
 node eval/parity.mjs               # JS features and logits match torch; batching changes nothing
 node eval/webgpu.mjs               # WGSL matches JS in headless Chrome (software adapter)
-node eval/score.mjs eval/dev.json -v
+node eval/score.mjs eval/dev-v2.json -v
 
 npm i --no-save webgpu && node eval/native-gpu.mjs   # WGSL and timings on a real GPU
+
+scripts/run_experiment.sh <name> <commit> [seed]     # train and score one commit in its own worktree
 ```
 
-Tune against `eval/dev.json`. Using `eval/test.json` for tuning would make its score meaningless.
+Tune against `eval/dev-v2.json`. Tuning against `eval/test-v2.json` would make its score meaningless, so the tools only print its totals.
+
+`eval/human.json` is for prompts written by people who haven't seen the grammar. It's the most honest test this project can have. Each entry looks like `{"c": "natural", "q": "the prompt", "yes": ["should match"], "no": ["shouldn't match"]}`.
 
 The architecture and evaluation habits come from [gpu-lexer](https://gpu-lexer.vercel.app), [gpu-time](https://github.com/arikchakma/gpu-time), [gpu-query](https://github.com/safzanpirani/gpu-query), [gpu-cron](https://github.com/manuschillerdev/gpu-cron) and [gpu-utils](https://github.com/AnandChowdhary/gpu-utils).

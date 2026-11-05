@@ -1,0 +1,47 @@
+{
+ "n": 5000,
+ "token_acc": 0.999469299797369,
+ "seq_acc": 0.9938,
+ "top_confusions": [
+  [
+   "THEN->OR",
+   9
+  ],
+  [
+   "O->THEN",
+   5
+  ],
+  [
+   "O->ATOM",
+   4
+  ],
+  [
+   "O->WORDS",
+   2
+  ],
+  [
+   "THEN->O",
+   2
+  ],
+  [
+   "LINE->O",
+   2
+  ],
+  [
+   "CAPTURE->THEN",
+   1
+  ],
+  [
+   "LIT->ATOM",
+   1
+  ],
+  [
+   "NOT_CONTAIN->NOT_END",
+   1
+  ],
+  [
+   "NEG->O",
+   1
+  ]
+ ]
+}

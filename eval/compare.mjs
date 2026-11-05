@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 
 const [a, b] = process.argv.slice(2, 4).map((f) => JSON.parse(readFileSync(f)));
-const show = process.argv.includes("--show") && !/test/.test(a.file);
+const show = process.argv.includes("--show") && !/test|human/.test(a.file);
 if (a.file !== b.file) throw new Error(`different eval sets: ${a.file} vs ${b.file}`);
 const wins = [], losses = [];
 for (const q of Object.keys(a.per)) {

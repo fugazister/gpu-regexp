@@ -6,11 +6,15 @@ import { loadCpu, readJson } from "./lib.mjs";
 
 const args = process.argv.slice(2);
 const file = args[0] ?? "eval/dev-v2.json";
-const peek = !/test/.test(file) || args.includes("--peek");
+const peek = !/test|human/.test(file) || args.includes("--peek");
 const verbose = args.includes("-v") && peek;
 const jsonAt = args.indexOf("--json");
 const { parser } = loadCpu();
 const cases = readJson(file);
+if (!cases.length) {
+  console.log(`${file}: no prompts yet`);
+  process.exit(0);
+}
 
 /** 95% Wilson interval: honest about how little a small set can tell you. */
 function wilson(k, n) {
