@@ -22,9 +22,11 @@ PREFIXES = ["", "", "", "", "", "match", "matches", "find", "a regex for", "rege
             "pattern for", "a pattern matching", "a pattern for", "detect", "extract", "search for", "look for",
             "write a regex to match", "how do i match", "validate", "get all", "any", "something that matches", "all",
             "recognize", "parse", "check for", "i want a regex that finds", "need a regex for", "make a regex for"]
-NOISE = ("the a an some just any my our this that in of for to it please like kind sort thing things stuff text value "
-         "values string strings input only really basically simply actually valid so also which is are there can be "
-         "from at on by must should have has my your").split()
+# Words that also carry a role elsewhere ("only", "just", "some", "has", "have") must not appear here,
+# or the same word gets contradictory labels.
+NOISE = ("the a an any my our this that in of for to it please like kind sort thing things stuff text value "
+         "values string strings input really basically simply actually valid so also which is are there can be "
+         "from at on by must should my your").split()
 SUBJECT = ["string", "strings", "line", "lines", "text", "input", "value", "values", "anything", "something",
            "any line", "any string", "a line", "a string", "the string", "the line", "a value"]
 
