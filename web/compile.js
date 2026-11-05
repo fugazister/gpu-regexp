@@ -109,10 +109,15 @@ export function compile(tokens, roles, lex) {
 
   const contentAfter = (i) => spans.slice(i + 1).some((s) => s.role === "LIT" || s.role === "ATOM");
   const lastElem = () => cur.elems.at(-1);
-  const flush = () => {
+  const flush = (flushingTimes = false) => {
     if (!pend) return;
     const e = lastElem();
     const text = quantText(pend);
+    if (pend.type === null) {
+      // A bare count with nothing after it ("a vowel then two ...") belongs to something we couldn't read.
+      // Only "<atom> 3 times" counts backwards, and that's applied before reaching here.
+      if (!flushingTimes) { diagnostics.push("a count had nothing to apply to, so it was ignored"); pend = null; return; }
+    }
     if (e && text !== null) e.quant = text;
     else if (e && pend.type === "Q_MIN" && /^\{\d+\}$/.test(e.quant ?? "")) e.quant = e.quant.replace("}", ",}");
     else if (e && pend.type === "Q_MAX" && /^\{\d+\}$/.test(e.quant ?? "")) e.quant = e.quant.replace("{", "{0,");
@@ -164,7 +169,8 @@ export function compile(tokens, roles, lex) {
   };
 
   spans.forEach((sp, i) => {
-    const role = sp.role, next = spans[i + 1]?.role;
+    const role = sp.role;
+    const next = spans.slice(i + 1).find((x) => x.role !== "O")?.role; // filler never separates a count from "times"
     if (role === "LIT") return addLiteral(sp.text, sp);
     if (role === "ATOM") {
       const resolved = resolveAtom(sp, lex, diagnostics);
@@ -183,13 +189,13 @@ export function compile(tokens, roles, lex) {
       }
       pend ??= { type: null, nums: [] };
       pend.nums.push(n);
-      if (next === "Q_TIMES") flush();
+      if (next === "Q_TIMES") flush(true);
       return;
     }
     if (QUANTS.has(role)) {
       pend ??= { type: null, nums: [] };
       pend.type = role;
-      if (next === "Q_TIMES") flush();
+      if (next === "Q_TIMES") flush(true);
       return;
     }
     if (role === "OR") {

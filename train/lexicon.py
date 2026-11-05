@@ -72,6 +72,7 @@ CLASSES = [
     (".", ["character", "any character", "char", "any char", "anything"], ["characters", "any characters", "chars", "anything"], None),
     ("[0-9a-fA-F]", ["hex digit", "hexadecimal digit", "hex character"], ["hex digits", "hexadecimal digits", "hex characters", "hex"], "0-9a-fA-F"),
     ("[aeiouAEIOU]", ["vowel"], ["vowels"], "aeiouAEIOU"),
+    ("[b-df-hj-np-tv-zB-DF-HJ-NP-TV-Z]", ["consonant"], ["consonants"], "b-df-hj-np-tv-zB-DF-HJ-NP-TV-Z"),
     (r"[^\w\s]", ["punctuation mark", "punctuation character", "special character", "symbol"], ["punctuation", "punctuation marks", "punctuation characters", "special characters", "symbols"], None),
 ]
 
