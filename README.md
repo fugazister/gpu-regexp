@@ -47,15 +47,15 @@ Scored by behaviour: a prompt passes if its regex matches every string it should
 
 | Prompts | Passed |
 |---|---:|
-| Test set (201) | 169 (84.1%, 95% CI 78.4–88.5) |
+| Test set (201) | 167 (83.1%, 95% CI 77.3–87.6) |
 | Dev set (60) | 57 (95%) |
 | `natural` test prompts only (45) | 20 (44%) |
-| [StructuredRegex](https://github.com/xiye17/StructuredRegex), written by other people (996 across two test splits) | 20 (2.0%) |
-| StructuredRegex, only regexes the grammar could express (159) | 9 (5.7%) |
+| [StructuredRegex](https://github.com/xiye17/StructuredRegex), written by other people (996 across two test splits) | 46 (4.6%) |
+| StructuredRegex, only regexes the grammar could express (159) | 16 (10.1%) |
 
 Read these with care. One author wrote the first three sets and the grammar, so they aren't independent. StructuredRegex is independent, and much harder than typing a short prompt: its descriptions are long and formal, and most describe regexes this project can't express. The real answer on everyday phrasing is somewhere in between. The checks are also lenient: a prompt can pass with a regex that's broader than it should be.
 
-**[EXPERIMENTS.md](EXPERIMENTS.md)** explains how better training data took the test score from 80% to 84%, what didn't improve, why the independent score is so low, and how sure we can be.
+**[EXPERIMENTS.md](EXPERIMENTS.md)** explains how better training data took the test score from 80% to about 84%, what didn't improve, why the independent score is so low, and how sure we can be.
 
 An earlier comparison with a seq2seq transformer, on a smaller test set (40 prompts) that has since been retired:
 
@@ -87,8 +87,8 @@ A single prompt is faster on the CPU, so the demo normally types on the CPU desp
 
 - **Natural phrasing often fails.** Only 44% of the `natural` test prompts pass, and better training data didn't change that.
 - **Coverage is the grammar and lexicon.** Thousands separators and group repetition (`(ab){3}`) aren't supported.
-- **Words it doesn't know can land in the regex.** `numbers with commas as thousands separators` gives `\d+commas as thousands`, and `a filename with no spaces` gives `filename[^ ]*`.
-- **It doesn't refuse, and confidence can't be trusted.** `the quick brown fox` gives `/brown/` at confidence .99, and `asdf qwer zxcv` gives `/asdfzxcv/` at .48. Diagnostics only cover what the compiler can detect.
+- **Words it doesn't know can land in the regex.** `numbers with commas as thousands separators` gives `\d+,+thousands separators`.
+- **It doesn't refuse, and confidence can't be trusted.** `the quick brown fox` gives `/brown/` at confidence .97, and `asdf qwer zxcv` gives `/zxcv/` at 1.00. Diagnostics only cover what the compiler can detect.
 - **Mistakes can be silent.** `a string of exactly ten digits` loses the count and gives `\d+`.
 - **Fuzzy matching doesn't catch everything.** In `digts folowed by a dahs`, `dahs` is copied as literal text.
 - **Presets are opinionated approximations**, such as email and URL. Generated patterns aren't checked for catastrophic backtracking, so don't run them on untrusted input without review.
