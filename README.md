@@ -68,16 +68,16 @@ The gap between the two is only four prompts, so this is weak evidence on its ow
 
 ### Speed
 
-Tagging only, median of 7 warm runs, RTX 4060 through Dawn in Node. Prompts are 86 fixtures repeated to fill the batch. CPU is the JS backend on the same machine. Measured on the previous weights; the architecture and size haven't changed.
+Tagging only, median of 7 warm runs, RTX 4060 through Dawn in Node. Prompts are 86 fixtures repeated to fill the batch. CPU is the JS backend on the same machine.
 
 | Prompts | CPU | WebGPU | Speedup |
 |---:|---:|---:|---:|
-| 1 | 0.4 ms | 1.3 ms | 0.3× |
-| 32 | 11.2 ms | 2.2 ms | 5.0× |
-| 256 | 143 ms | 10 ms | 14× |
-| 1,024 | 470 ms | 41 ms | 12× |
-| 4,096 | 1,978 ms | 152 ms | 13× |
-| 16,384 | 8,058 ms | 596 ms | 14× |
+| 1 | 0.2 ms | 1.2 ms | 0.2× |
+| 32 | 12.6 ms | 2.2 ms | 5.7× |
+| 256 | 133 ms | 8.2 ms | 16× |
+| 1,024 | 530 ms | 69 ms | 7.7× |
+| 4,096 | 2,113 ms | 145 ms | 15× |
+| 16,384 | 8,724 ms | 649 ms | 13× |
 
 A single prompt is faster on the CPU, so the demo normally types on the CPU despite the name. This is one machine, not a cross-device benchmark. The page's **Compare CPU and GPU** button measures yours.
 
