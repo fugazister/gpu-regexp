@@ -4,7 +4,7 @@
 
 - **Done:** Round 1, data fixes. The E5-s2 model is shipped.
 - **Now:** Nothing is running.
-- **Next:** Round 2, teach the model to say "I don't know" (see [Next](#next)).
+- **Next:** Get an independent score from public datasets, then Round 2 (see [Next](#next)).
 
 ## Round 1: Can better training data beat the limits?
 
@@ -138,7 +138,7 @@ The final score is 169/201, **84.1% (95% CI 78.4–88.5)**. This is suggestive, 
 
 ### Why this result could be too optimistic
 
-- **The test set isn't independent.** The same author wrote the grammar and all 201 prompts, knowing what the grammar supports. Real users would probably score lower, which is what `eval/human.json` is for.
+- **The test set isn't independent.** The same author wrote the grammar and all 201 prompts, knowing what the grammar supports. Real users would probably score lower, which is why the next step is a public dataset.
 - **Possible contamination:** Some E4 phrasing resembles test prompts (such as `version numbers like 2.0.1`). The fixes came from dev and retired-test failures, but the author had seen the test prompts while writing them. `natural` stayed flat, so there's no sign this inflated the score, but it can't be ruled out.
 - **The test has now been used.** Its totals and category scores have been seen, and they point at `natural`. Any further tuning aimed at that score will gradually spoil it, so the next rounds need new prompts.
 - **Possible regression:** `a string of exactly ten digits` passes at E0-s1 and E1 to E3, but fails at E0-s2, at E4 and on both E5 seeds, which includes the shipped model. It may be seed noise or a side effect of E4. It hasn't been investigated.
@@ -169,7 +169,9 @@ Prompts below are from the shipped model, on dev or made up by hand:
 
 ## Next
 
-**Round 2 (recommended): teach it to refuse, then measure calibration.** Add nonsense and off-topic negatives to training, then check whether a stated 90% confidence is right 90% of the time. If it works, `the quick brown fox` gets "I can't read this" instead of `/brown/`. It's the fix users would notice most, and it teaches calibration, abstention and precision/recall trade-offs.
+**First: score the model on descriptions written by other people.** [StructuredRegex](https://github.com/xiye17/StructuredRegex) has crowdworker descriptions with positive and negative examples, which suits behavioural scoring as is. [KB13 and NL-RX-Turk](https://github.com/nicholaslocascio/deep-regex) have crowdworker descriptions with gold regexes, so match strings would have to be generated. Expect low scores, since many of these regexes are beyond this grammar. Report how many are in scope separately from how many pass.
+
+**Round 2: teach it to refuse, then measure calibration.** Add nonsense and off-topic negatives to training, then check whether a stated 90% confidence is right 90% of the time. If it works, `the quick brown fox` gets "I can't read this" instead of `/brown/`. It's the fix users would notice most, and it teaches calibration, abstention and precision/recall trade-offs.
 
 **After that:**
 
