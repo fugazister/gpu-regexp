@@ -65,6 +65,7 @@ const server = createServer(async (req, res) => {
     res.end();
     const r = JSON.parse(body);
     console.dir(r, { depth: null });
+    if (real && /swiftshader|llvmpipe|lavapipe/i.test(r.adapter ?? "")) { console.error("--real fell back to a software adapter"); return finish(3); }
     return finish(!r.error && r.roleDiff === 0 && r.singleDiff === 0 ? 0 : 1);
   }
   try {
@@ -74,10 +75,12 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(0, "127.0.0.1", () => {
-  const adapter = real ? ["--use-angle=vulkan", "--ignore-gpu-blocklist"] : ["--use-webgpu-adapter=swiftshader"];
+  const adapter = real
+    ? ["--use-vulkan=native", "--use-angle=vulkan", "--ignore-gpu-blocklist", "--disable-vulkan-surface", "--enable-features=Vulkan,VulkanFromANGLE,DefaultANGLEVulkan"]
+    : ["--use-webgpu-adapter=swiftshader", "--enable-features=Vulkan"];
   chrome = spawn(process.env.CHROME ?? "google-chrome-stable", [
     "--headless=new", "--no-first-run", `--user-data-dir=${profile}`,
-    "--enable-unsafe-webgpu", "--enable-features=Vulkan", ...adapter,
+    "--enable-unsafe-webgpu", ...adapter,
     `http://127.0.0.1:${server.address().port}/`,
   ], { stdio: "ignore" });
 });
