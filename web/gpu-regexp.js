@@ -50,7 +50,8 @@ export function createParser(spec, lexicon, backends) {
     if (truncated) out.diagnostics.unshift(`only the first ${MAX_TOKENS} words were read`);
     let regexp = null;
     if (out.source !== null) {
-      try { regexp = new RegExp(out.source, out.flags); }
+      // .source escapes "/" so the result can be pasted as a /literal/.
+      try { regexp = new RegExp(out.source, out.flags); out.source = regexp.source; }
       catch (e) { out.diagnostics.push("compiled to an invalid regex: " + e.message); out.source = null; }
     }
     const confidence = tagged.length ? Math.min(...tagged.map((t) => t.p)) : 0;
