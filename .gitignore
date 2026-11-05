@@ -7,3 +7,4 @@ baseline/
 eval/oracle.json
 train/smoke/
 node_modules/
+results/*.log
