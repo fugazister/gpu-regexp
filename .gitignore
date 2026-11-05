@@ -6,3 +6,4 @@ train/out/
 baseline/
 eval/oracle.json
 train/smoke/
+node_modules/
