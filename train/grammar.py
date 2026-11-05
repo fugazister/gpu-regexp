@@ -27,6 +27,17 @@ PREFIXES = ["", "", "", "", "", "match", "matches", "find", "a regex for", "rege
 NOISE = ("the a an any my our this that in of for to it please like kind sort thing things stuff text value "
          "values string strings input really basically simply actually valid so also which is are there can be "
          "from at on by must should my your").split()
+# People often describe a pattern by example or by format. These tails are filler to the compiler.
+EXAMPLES = {
+    "<DATE_ISO>": ["2024-01-31", "1999-12-25"], "<DATE_US>": ["12/25/2024", "1/2/2020"], "<TIME>": ["12:30", "09:15", "23:59:59"],
+    "<SEMVER>": ["1.2.3", "2.0.1", "10.4.12"], "<IPV4>": ["192.168.0.1", "8.8.8.8"], "<PHONE>": ["555-123-4567", "(555) 123-4567"],
+    "<EMAIL>": ["me@example.com", "a.b@c.org"], "<HEXCOLOR>": ["#ff00aa", "#fff"], "<ZIP>": ["90210", "12345-6789"],
+    "<URL>": ["https://example.com", "http://a.io/x"], "<PERCENT>": ["50%", "12.5%"], "<MONEY>": ["$9.99", "$5"],
+    "<FLOAT>": ["3.14", "0.5"], "<INT>": ["42", "-7"], "<HASHTAG>": ["#cool"], "<MENTION>": ["@bob"], "<NUMBER>": ["42", "1000"],
+    "<SSN>": ["123-45-6789"], "<MAC>": ["00:1a:2b:3c:4d:5e"], "<DOMAIN>": ["example.com"],
+}
+FORMATS = {"<DATE_ISO>": ["yyyy-mm-dd", "iso", "iso 8601"], "<DATE_US>": ["mm/dd/yyyy", "dd/mm/yyyy", "us"], "<TIME>": ["hh:mm", "hh:mm:ss", "24 hour"]}
+
 # Short everyday words people use as literals, even though the grammar also uses some of them.
 PLAIN_LITS = "yes no on off in out up down start stop end true false get set new old first last left right top bottom open close none".split()
 SUBJECT = ["string", "strings", "line", "lines", "text", "input", "value", "values", "anything", "something",
@@ -263,12 +274,23 @@ class Gen:
         lead = self.c(["anything except", "anything but", "no", "characters other than", "everything except", "not", "any characters except", "anything other than"])
         return [S(lead, "NEG")] + self.join_items([self.c(i[2]) for i in items]), "[^" + "".join(i[0] for i in items) + "]*"
 
+    def preset_tail(self, tok):
+        """ "... like 1.2.3" or "... in hh:mm format": filler that a real prompt often adds."""
+        if self.r.random() > 0.2:
+            return []
+        if tok in FORMATS and self.r.random() < 0.5:
+            f = self.c(FORMATS[tok])
+            return [S(self.c(["in", "in the", "with the", "using"])), S(f), S(self.c(["format", "style", "form"]))]
+        if tok in EXAMPLES:
+            return [S(self.c(["like", "such as", "e.g.", "for example", "for instance", "similar to", "looking like"])), S(self.c(EXAMPLES[tok]))]
+        return []
+
     def preset_el(self):
         tok = self.c(list(PRESETS))
         src, forms = PRESETS[tok]
         p = self.c(forms)
         lead = self.c(["", "", self.art(p), "any", "valid", "the", "a valid"])
-        return words(lead) + [S(p, "ATOM")], src
+        return words(lead) + [S(p, "ATOM")] + self.preset_tail(tok), src
 
     def element(self):
         k = self.r.random()
@@ -397,7 +419,7 @@ class Gen:
         A = S(p, "ATOM")
         k = self.r.random()
         if k < 0.72 or tok in ("<TRAILWS>", "<LEADWS>", "<EMPTYLINE>", "<BLANKLINE>"):
-            return words(self.c(["", "", self.art(p), "a valid", "valid", "any", "all", "the"])) + [A], src
+            return words(self.c(["", "", self.art(p), "a valid", "valid", "any", "all", "the"])) + [A] + self.preset_tail(tok), src
         if k < 0.86:
             lead = self.c(["only", "entire string is", "whole string is", "that is exactly", "with only", "that is"])
             return self.subject() + [S(lead, "ONLY"), S(self.art(p)), A], f"^{src}$"
