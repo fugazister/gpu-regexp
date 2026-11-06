@@ -9,6 +9,7 @@ import re
 
 from features import tokenize
 from lexicon import CLASSES, COMMON_WORDS, LEX, PRESETS, PUNCT, SYLL, SYMBOL_LITS, compact
+from negatives import Negatives
 
 ROLES = ("O LIT NUM ATOM Q_PLUS Q_STAR Q_OPT Q_MIN Q_MAX Q_RANGE Q_TIMES OR THEN NEG WORD WORDS LINE "
          "START END ONLY CONTAINS NOT_START NOT_END NOT_CONTAIN CAPTURE ICASE PASSWORD EXT").split()
@@ -40,6 +41,8 @@ FORMATS = {"<DATE_ISO>": ["yyyy-mm-dd", "iso", "iso 8601"], "<DATE_US>": ["mm/dd
 
 # Short everyday words people use as literals, even though the grammar also uses some of them.
 PLAIN_LITS = "yes no on off in out up down start stop end true false get set new old first last left right top bottom open close none".split()
+# How often training sees text that isn't a request, labelled all O so the compiler refuses it.
+NEGATIVE_RATE = 0.12
 # Roles that can open a new sentence.
 SENTENCE_STARTS = ("THEN", "START", "END", "CONTAINS")
 SUBJECT = ["string", "strings", "line", "lines", "text", "input", "value", "values", "anything", "something",
@@ -62,6 +65,9 @@ class Gen:
     def __init__(self, rng, fixed=None):
         self.r = rng
         self.fixed = fixed  # None => every literal is quoted, used to discover the fixed words
+        if fixed is not None:
+            noise = set(NOISE)
+            self.negatives = Negatives(rng, SYLL, lambda w: w in fixed and w not in noise)
 
     def c(self, xs):
         return self.r.choice(xs)
@@ -499,6 +505,10 @@ class Gen:
         return " ".join(ws)
 
     def sample_segs(self):
+        if self.fixed is not None and self.r.random() < NEGATIVE_RATE:
+            text = self.negatives.sample()
+            segs = self.sentences([S(text[0].upper() + text[1:] if self.r.random() < 0.3 else text)])
+            return segs, None, "m", False
         names, weights = zip(*self.SHAPES)
         segs, rx = getattr(self, self.r.choices(names, weights)[0])()
         segs = words(self.c(PREFIXES)) + segs

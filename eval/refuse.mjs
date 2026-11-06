@@ -50,7 +50,7 @@ function summary(t) {
   };
 }
 const line = (s) =>
-  `t=${s.threshold.toFixed(2)}  non-requests refused ${s.garbageRefused}/${s.garbageTotal} (${pct(s.garbageRefused, s.garbageTotal)}%) | ` +
+  `t=${s.threshold.toFixed(3)}  non-requests refused ${s.garbageRefused}/${s.garbageTotal} (${pct(s.garbageRefused, s.garbageTotal)}%) | ` +
   `real requests still passing ${s.validPassed}/${s.validTotal}, refused ${s.validRefused}, good answers lost ${s.goodAnswersLost} | ` +
   `StructuredRegex answered ${s.stregAnswered}/${s.stregTotal}, right ${s.stregRight} (${pct(s.stregRight, s.stregAnswered)}%)`;
 

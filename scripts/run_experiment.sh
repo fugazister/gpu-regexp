@@ -25,6 +25,7 @@ if [ "${SCORE_TEST:-0}" = 1 ]; then node eval/score.mjs eval/test-v2.json --json
 if [ -d "$repo/eval/external" ] && [ -f eval/streg.mjs ]; then
   cp -r "$repo/eval/external" eval/
   node eval/streg.mjs dev --json "$results/$name.streg-dev.json"
+  if [ -f eval/refuse.mjs ]; then node eval/refuse.mjs dev --json "$results/$name.refuse-dev.json"; fi
 fi
 cp train/out/tagger.pt "$results/$name.pt"
 tail -1 train/train.log
