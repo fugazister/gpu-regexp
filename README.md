@@ -39,7 +39,7 @@ await gr.parseMany(prompts); // batches; uses WebGPU from 32 prompts up
 2. **Tag (WebGPU or CPU).** Summed embeddings, two layers of gated bidirectional scans, a 5-tap convolution, and a two-layer head. Weights are int6, trained with fake quantization.
 3. **Compile (CPU).** `web/compile.js` holds all the regex semantics. A 387-form lexicon decides what an `ATOM` span means, tolerating small typos. The model never writes regex text, so its mistakes produce a wrong regex, not an invalid one.
 
-Training data comes from a grammar (`train/grammar.py`) that emits labels and a gold regex built independently of the compiler.
+Training data comes from a grammar (`train/grammar.py`) that emits labels and a gold regex built independently of the compiler. It also includes 192 real descriptions from StructuredRegex, whose word labels were inferred by searching for roles that compile to a regex behaving like the dataset's own (`train/label_real.mjs`).
 
 ## Results
 
@@ -47,16 +47,16 @@ Scored by behaviour: a prompt passes if its regex matches every string it should
 
 | Prompts | Passed |
 |---|---:|
-| Test set (201) | 167 (83.1%, 95% CI 77.3–87.6) |
+| Test set (201) | 165 (82.1%, 95% CI 76.2–86.8) |
 | Dev set (60) | 58 (96.7%) |
-| `natural` test prompts only (45) | 21 (47%) |
-| [StructuredRegex](https://github.com/xiye17/StructuredRegex), written by other people (996 across two test splits) | 43 (4.3%) |
-| StructuredRegex, only regexes the grammar could express (159) | 18 (11.3%) |
+| `natural` test prompts only (45) | 24 (53%) |
+| [StructuredRegex](https://github.com/xiye17/StructuredRegex), written by other people (996 across two test splits) | 93 (9.3%) |
+| StructuredRegex, only regexes the grammar could express (159) | 40 (25.2%) |
 
 | Input that isn't a request | Refused |
 |---|---:|
-| Hand-written: mash, chat, code, foreign text (60) | 59 (98%) |
-| Real prose: licences and an article (284) | 188 (66%) |
+| Hand-written: mash, chat, code, foreign text (60) | 58 (97%) |
+| Real prose: licences and an article (284) | 169 (60%) |
 
 Read these with care. One author wrote the first three sets and the grammar, so they aren't independent. StructuredRegex is independent, and much harder than typing a short prompt: its descriptions are long and formal, and most describe regexes this project can't express. The real answer on everyday phrasing is somewhere in between. The checks are also lenient: a prompt can pass with a regex that's broader than it should be.
 
@@ -90,12 +90,12 @@ A single prompt is faster on the CPU, so the demo normally types on the CPU desp
 
 ## Limitations
 
-- **Natural phrasing often fails.** Only 47% of the `natural` test prompts pass, and better training data didn't change that.
+- **Natural phrasing often fails.** Only 53% of the `natural` test prompts pass.
 - **Coverage is the grammar and lexicon.** Thousands separators and group repetition (`(ab){3}`) aren't supported.
 - **Words it doesn't know can land in the regex.** `numbers with commas as thousands separators` gives `\d+,+`, which drops the digits after the comma.
-- **Refusal is partial, and confidence can't be trusted.** `the quick brown fox` and `asdf qwer zxcv` now get no regex, but about a third of real prose still gets one, more often for long sentences. `what time is it` gives a time regex at confidence .95. Diagnostics only cover what the compiler can detect.
+- **Refusal is partial, and confidence can't be trusted.** `the quick brown fox` and `asdf qwer zxcv` get no regex, but about 40% of real prose still gets one, more often for long sentences. Diagnostics only cover what the compiler can detect.
 - **Mistakes can be silent.** `a string of exactly ten digits` loses the count and gives `\d+`.
-- **Fuzzy matching doesn't catch everything.** In `digts folowed by a dahs`, `dahs` is copied as literal text.
+- **Typos got worse in the latest model.** 11 of 20 typo prompts pass, down from 18. `digts folowed by a dahs` gives just `/dahs/`.
 - **Presets are opinionated approximations**, such as email and URL. Generated patterns aren't checked for catastrophic backtracking, so don't run them on untrusted input without review.
 - The tokenizers can differ on unusual non-ASCII text; parity is tested on the generated prompts and a few handwritten edge cases, which are mostly ASCII.
 

@@ -1,0 +1,44 @@
+{
+ "at": {
+  "threshold": 0,
+  "garbageRefused": 57,
+  "garbageTotal": 60,
+  "validPassed": 161,
+  "validTotal": 201,
+  "validRefused": 6,
+  "goodAnswersLost": 0,
+  "stregAnswered": 967,
+  "stregRight": 90,
+  "stregTotal": 996
+ },
+ "cats": {
+  "mash": [
+   12,
+   12
+  ],
+  "sentence": [
+   10,
+   12
+  ],
+  "question": [
+   10,
+   10
+  ],
+  "chat": [
+   7,
+   8
+  ],
+  "code": [
+   6,
+   6
+  ],
+  "foreign": [
+   6,
+   6
+  ],
+  "symbols": [
+   6,
+   6
+  ]
+ }
+}

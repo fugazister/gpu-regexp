@@ -2,9 +2,9 @@
 
 ## Status
 
-- **Done:** Round 1 data fixes, an independent score, the sentence period fix, and Round 2 (refusal). The E7-s2 model is shipped.
+- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), and Round 3 (real descriptions). The E9-s2 model is shipped.
 - **Now:** Nothing is running.
-- **Next:** Train on StructuredRegex's real descriptions and upgrade the compiler (see [Next](#next)).
+- **Next:** Win back typo handling, which Round 3 made worse (see [Next](#next)).
 
 ## Round 1: Can better training data beat the limits?
 
@@ -262,32 +262,86 @@ The test set was frozen before the negatives were written, but one author wrote 
 
 On real requests (own dev and StructuredRegex `dev`, E7-s2), answers with confidence from .80 to .95 are right 21.6% of the time, and .95 to .99 only 14.3%. Above .99 they're right 82.7%. Confidence is low on many wrong prose answers: at threshold .6, E7-s2 would refuse 225/284 prose sentences and lose no good answers on own dev, but StructuredRegex `dev` would fall from 20 to 17. This wasn't applied, because it was noticed after the frozen results were seen.
 
+## Round 3: Training on real descriptions
+
+**Short answer:** Yes. The score on descriptions the model never saw more than doubled, from 43 to 93 of 996, while the own test set held within noise. It cost typo handling.
+
+**The problem:** StructuredRegex has 2,173 training descriptions, but only a regex and example strings for each, not the word-by-word roles this model trains on. Labelling them by hand wasn't an option.
+
+**The method: learning from denotations.** `train/label_real.mjs` starts from the current model's roles and runs a beam search that changes as few words as it can, until the compiled regex behaves like the gold one. A label is kept only if it agrees with the gold regex on the dataset's examples and on about 120 strings generated from the gold regex.
+
+**The known trap is spurious labels.** They give the right regex for the wrong reason. Reading samples found `starts/START with/END`, `first/ONLY`, `string/Q_PLUS` and `times/NEG`, all passing every check. Training on those would add the kind of label noise that E1 removed, so two filters were added:
+
+- A role with no regex text of its own must sit on a phrase the grammar really uses for that role. Otherwise the word goes back to filler, and if the regex then breaks, the description is dropped.
+- Labels that would teach something false about common phrases are rejected, such as "ends with" labelled as filler.
+
+| From 2,173 training descriptions | Count |
+|---|---:|
+| Share a regex with a held-out split, so excluded | 14 |
+| Compiler can reach the regex | 725 |
+| Search found a labelling | about 275 |
+| After the filters | **192, across 127 regexes** |
+
+Reading 30 of the final labels by hand found 3 with a small error, such as `3 to 4` with `to` left as filler, so some noise remains. These 192 make up 15% of each batch, with their counts randomly swapped so they're harder to memorise.
+
+**Two changes, measured separately:**
+
+- **E8: the compiler and grammar.** "Starts with a and ends with b" leaves a gap. With three or more parts in order, there's now no gap, because that describes the whole string.
+- **E9: E8 plus the 192 real descriptions.** Seed 2 was chosen on dev before any frozen set was scored.
+
+| | E7-s1 | E7-s2 | E8-s1 | E8-s2 | E9-s1 | E9-s2 (shipped) |
+|---|---:|---:|---:|---:|---:|---:|
+| StructuredRegex `dev` /351 | 26 | 20 | 28 | 28 | 47 | **53** |
+| StructuredRegex `teste` + `testi` /996 | 57 | 43 | 59 | 52 | 90 | **93** |
+| In scope, `teste` + `testi` /159 | 25 | 18 | 28 | 20 | 40 | **40** |
+| Same, forgiving a missing anchor /996 | 62 | 53 | 68 | 62 | 124 | **122** |
+| Own test set /201 | 166 | 167 | 161 | 164 | 161 | **165** |
+| `natural` /45 | 23 | 21 | 20 | 20 | 22 | **24** |
+| `typos` /20 | 15 | 18 | 15 | 16 | 13 | **11** |
+| Own dev set /60 | 57 | 58 | 57 | 57 | 57 | **58** |
+| Non-requests refused /60 | 59 | 59 | 58 | 60 | 57 | **58** |
+| Real prose refused /284 | 146 | 188 | 176 | 185 | 165 | **169** |
+
+- **The gain held on unseen data.** E7-s2 → E9-s2 was 19 gained and 4 lost on `teste` (p=0.003), and 40 gained and 5 lost on `testi` (p<0.0001). Both E9 seeds agree. The p-values treat descriptions as independent, so they're somewhat too small.
+- **The own test set held.** E7-s2 → E9-s2 was 7 gained and 9 lost (p=0.80). On E9-s1 it was 4 gained and 10 lost (p=0.18), which is within noise but leans the wrong way.
+- **The compiler rule alone isn't proven.** E8 looked good on dev (20 → 28), but on the frozen splits E8-s2 was 3 gained and 2 lost, then 16 gained and 8 lost (p=0.15). It went live with E7 weights before those splits were scored, which was an unplanned side effect of pushing the code.
+- **Small data went a long way, for a reason worth checking.** 192 sentences beat about 7.7 million synthetic samples on this measure. A likely reason is that they cover phrasing the grammar never produces, but that's a hypothesis.
+
+### What it cost
+
+- **Typos got worse, and this looks real.** `typos` fell from 18 to 11 on the shipped seed, and both E9 seeds are below both E7 seeds. `digts folowed by a dahs` now gives `/dahs/`. The dev sets didn't show this, so it was only found on the test set, and any fix needs its own dev prompts. One possible cause, not tested: real descriptions replace 15% of each batch and have few typos.
+- **Prose refusal didn't really move.** The shipped seed went from 188 to 169 of 284, but that comparison flatters E7-s2. Averaged over seeds, E7 and E9 both refuse 167.
+- **Confidence is still unreliable.** Answers above .99 are right 78.9% of the time on real requests, and those from .95 to .99 only 37.9%.
+
+### What's left
+
+- **Most reachable descriptions still aren't used.** 192 of 725 is 26%. Relabelling with E9 could find more, because a better model starts closer to the answer.
+- **29 more correct answers only lack an anchor.** Forgiving a missing anchor gives 122 instead of 93, so the model reads those descriptions correctly and the regex just isn't tied to the whole string.
+
 ## What's still broken
 
 Prompts below are from the shipped model, on dev or made up by hand:
 
 | Prompt | Output | Problem |
 |---|---|---|
-| `what time is it` | `/(?:[01]\d\|2[0-3]):[0-5]\d(?::[0-5]\d)?/`, confidence .95 | Should refuse: a question that contains a pattern word |
-| `Gray is plain text, including the spaces.` | `/ +/`, confidence .90 | Should refuse: real prose often gets through |
+| `digts folowed by a dahs` | `/dahs/`, confidence .92 | New in E9: typos now often lose the rest of the prompt |
+| `a filename with no spaces` | `/^(?!.*[^ ]*).*$/`, confidence .49 | A wrong negation that matches almost nothing |
+| `Gray is plain text, including the spaces.` | `/ +/`, confidence .97 | Should refuse: real prose often gets through |
 | `numbers with commas as thousands separators` | `/\d+,+/` | Not in the grammar, though it passes the lenient dev check |
-| `a string of exactly ten digits` | `/\d+/` | Loses the count, cause unknown |
-| `a filename with no spaces` | `/[^ ]*/` | New in E7-s2: fails a dev check that E6-s1 passed |
+| `a string of exactly ten digits` | `/\d+/`, confidence 1.00 | Loses the count, cause unknown |
 | `(ab) three times` | `/(?:\(ab\)){3}/` | No group repetition (the parentheses are literal) |
 
 ## Next
 
-**Round 3 (recommended): make real descriptions readable.** Train on StructuredRegex `train` and upgrade the compiler, items 3 and 4 below. Refusal is good enough for short input, and accuracy on real descriptions is still the biggest gap.
+**Round 4 (recommended): win back typos, then reach more descriptions.** Write typo prompts for dev, since it has too few to show the problem, and add typos to the real descriptions during training. Then relabel with E9 to use more of the 725, and work down the compiler table below.
 
-**Parked: better refusal on prose (E8).** Add real prose from a new source to the negatives, then test a threshold around .6. The licences and article have now been read, so they count as dev data, and measuring this honestly needs prose that hasn't been looked at.
+**Parked: better refusal on prose.** Add real prose from a new source to the negatives, then test a threshold around .6. The licences and article have now been read, so they count as dev data, and measuring this honestly needs prose that hasn't been looked at.
 
 **After that:**
 
 1. **Examples as a safety net.** Generate the top few candidate regexes and test them against strings the user says should or shouldn't match. This can fix wrong answers without improving the model, and it's the best showcase in this list.
 2. **Model experiments.** Ablation of each layer, learning curves (does more data still help?), a CRF output layer, and more seeds.
-3. **Train on real descriptions.** StructuredRegex `train` has 2,173, but no word-by-word labels, so labels would have to be inferred and kept only if they compile to an equivalent regex. This is the biggest lever on in-scope failures. It would use only `train`, keeping `dev`, `teste` and `testi` for measuring.
-4. **Upgrade the compiler,** working down the expressibility table from the top.
-5. **LLM-paraphrased training data, verified by the compiler.** Another direct attack on `natural`. [KB13 and NL-RX-Turk](https://github.com/nicholaslocascio/deep-regex) are also available as further independent tests, once match strings are generated for them.
+3. **LLM-paraphrased training data, verified by the compiler.** Another direct attack on `natural`. [KB13 and NL-RX-Turk](https://github.com/nicholaslocascio/deep-regex) are also available as further independent tests, once match strings are generated for them.
 
 ## Reproduce
 
@@ -297,6 +351,8 @@ node eval/compare.mjs results/E0-s2.dev.json results/E5-s2.dev.json --show
 train/.venv/bin/python train/probe.py results/E0-s1.pt results/E5-s2.pt
 SCORE_TEST=1 scripts/run_experiment.sh E7-s2 aa3b9a5 2
 node eval/refuse.mjs test --threshold 0         # frozen refusal test, with the model in web/
+SCORE_TEST=1 scripts/run_experiment.sh E9-s2 593157a 2
+node train/label_real.mjs train/real_labels.jsonl   # needs StructuredRegex train.tsv in eval/external/streg/
 node eval/refuse-real.mjs /usr/share/licenses/spdx/GPL-3.0-only.txt   # any text files; the article text isn't committed
 ```
 
