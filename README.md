@@ -124,3 +124,7 @@ scripts/run_experiment.sh <name> <commit> [seed]     # train and score one commi
 Tune against `eval/dev-v2.json`. Tuning against `eval/test-v2.json` would make its score meaningless, so the tools only print its totals.
 
 The architecture and evaluation habits come from [gpu-lexer](https://gpu-lexer.vercel.app), [gpu-time](https://github.com/arikchakma/gpu-time), [gpu-query](https://github.com/safzanpirani/gpu-query), [gpu-cron](https://github.com/manuschillerdev/gpu-cron) and [gpu-utils](https://github.com/AnandChowdhary/gpu-utils).
+
+## Third-party data
+
+`results/*.streg*.json` quote descriptions from [StructuredRegex](https://github.com/xiye17/StructuredRegex), used under [its MIT licence](licenses/StructuredRegex-MIT.txt).
