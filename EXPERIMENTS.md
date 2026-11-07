@@ -295,7 +295,7 @@ Prompts below are from the shipped model, on dev or made up by hand:
 scripts/run_experiment.sh E5-s2 d4eaada 2       # on a GPU machine; SCORE_TEST=1 also scores test
 node eval/compare.mjs results/E0-s2.dev.json results/E5-s2.dev.json --show
 train/.venv/bin/python train/probe.py results/E0-s1.pt results/E5-s2.pt
-SCORE_TEST=1 scripts/run_experiment.sh E7-s2 a1882b9 2
+SCORE_TEST=1 scripts/run_experiment.sh E7-s2 19c3299 2
 node eval/refuse.mjs test --threshold 0         # frozen refusal test, with the model in web/
 node eval/refuse-real.mjs /usr/share/licenses/spdx/GPL-3.0-only.txt   # any text files; the article text isn't committed
 ```
