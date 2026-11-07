@@ -127,4 +127,4 @@ The architecture and evaluation habits come from [gpu-lexer](https://gpu-lexer.v
 
 ## Third-party data
 
-`results/*.streg*.json` quote descriptions from [StructuredRegex](https://github.com/xiye17/StructuredRegex), used under [its MIT licence](licenses/StructuredRegex-MIT.txt).
+`train/real_labels.jsonl` and `results/*.streg*.json` quote descriptions from [StructuredRegex](https://github.com/xiye17/StructuredRegex), used under [its MIT licence](licenses/StructuredRegex-MIT.txt).
