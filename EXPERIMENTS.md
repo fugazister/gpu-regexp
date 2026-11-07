@@ -279,7 +279,7 @@ On real requests (own dev and StructuredRegex `dev`, E7-s2), answers with confid
 |---|---:|
 | Share a regex with a held-out split, so excluded | 14 |
 | Compiler can reach the regex | 725 |
-| Search found a labelling | about 275 |
+| Search found a labelling | 284 |
 | After the filters | **192, across 127 regexes** |
 
 Reading 30 of the final labels by hand found 3 with a small error, such as `3 to 4` with `to` left as filler, so some noise remains. These 192 make up 15% of each batch, with their counts randomly swapped so they're harder to memorise.
