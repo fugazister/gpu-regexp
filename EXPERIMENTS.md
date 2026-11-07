@@ -2,9 +2,9 @@
 
 ## Status
 
-- **Done:** Round 1 data fixes, an independent score, and the sentence period fix. The E6-s1 model is shipped.
+- **Done:** Round 1 data fixes, an independent score, the sentence period fix, and Round 2 (refusal). The E7-s2 model is shipped.
 - **Now:** Nothing is running.
-- **Next:** Round 2, teach the model to refuse input it can't read (see [Next](#next)).
+- **Next:** Train on StructuredRegex's real descriptions and upgrade the compiler (see [Next](#next)).
 
 ## Round 1: Can better training data beat the limits?
 
@@ -220,21 +220,66 @@ How much of StructuredRegex `train` + `dev` (2,524 descriptions) becomes express
 | Top-level `and` / `not` constraints | 77% |
 | Nested `and` / `not` inside a sequence | 100% |
 
+## Round 2: Teaching it to refuse
+
+**Short answer:** Yes for short input, and only partly for real prose. Refusal went from 5% to 98% on the hand-written test, but real prose shows 66%, and that's the fairer number.
+
+**Hypothesis:** The model never saw text that isn't a request, so it had no way to learn "none of this is a pattern". **Change (E7):** 12% of training samples are now non-requests (keyboard mash, word salad, questions, chat, code, foreign text, symbols), with every word labelled filler. If nothing is tagged, the compiler returns no regex. A lone word still counts as a literal. Architecture and size are unchanged.
+
+| | E6-s1 | E6-s1, threshold .98 | E7-s1 | E7-s2 (shipped) |
+|---|---:|---:|---:|---:|
+| Hand-written non-requests refused /60 (frozen) | 3 | 55 | 59 | **59** |
+| Real prose refused /284 | 3 | | 146 | **188** |
+| Own test set passed /201 | 167 | 147 | 166 | **167** |
+| Own dev set passed /60 | 57 | 53 | 57 | **58** |
+| `natural` test prompts passed /45 | 20 | | 23 | **21** |
+| StructuredRegex `teste` + `testi` passed /996 | 46 | 13 | 57 | **43** |
+| StructuredRegex in scope passed /159 | 16 | | 25 | **18** |
+
+In the threshold column, a prompt passes only if the model also answers it. That threshold was chosen on dev, where it refused about as much as E7 does. Blank cells weren't measured.
+
+- **Training on negatives beat a confidence threshold.** A threshold on E6 reached 55/60 refusals, but it lost 20 good answers on the test set. E7 reached 59/60 without losing a net answer: 4 gained and 4 lost against E6-s1 (p=1.0). A threshold can only filter what the model already believes, while negatives change what it believes.
+- **The threshold is 0.** The sweep on dev showed that a higher threshold on E7 only loses good answers, so the product needed no change. Seed 2 was chosen on dev (29/30 refused, 58/60 passed) before any frozen set was scored.
+- **Real requests held up, as far as these sets can tell.** StructuredRegex went from 46 to 43 (`teste` 1 gained and 6 lost, p=0.125; `testi` 9 gained and 7 lost, p=0.80). The `teste` split leans the wrong way, so it's worth watching. Averaged over seeds, E7 gets 50/996 and E6 gets 42.5/996.
+
+### The frozen test was too easy
+
+The test set was frozen before the negatives were written, but one author wrote both, in the same seven categories. So it mostly measures whether the model learned my idea of a non-request. After scoring it, I added a check with text nobody wrote for this project: 284 sentences from the GPL-3.0, Apache-2.0 and MPL-2.0 licences and [the article that inspired this project](https://shud.in/thoughts/ideas-behind-gpu-lexer). None of them asks for a pattern.
+
+| Refused, real prose | E6-s1 | E7-s1 | E7-s2 |
+|---|---:|---:|---:|
+| All /284 | 3 (1%) | 146 (51%) | **188 (66%, 95% CI about 60–71)** |
+| 4–8 words /65 | 1 | 46 (71%) | 51 (78%) |
+| 9–15 words /86 | 1 | 53 (62%) | 66 (77%) |
+| 16–30 words /133 | 1 | 47 (35%) | 71 (53%) |
+
+- **The same data can give 98% or 66%.** The gap between those two numbers is distribution shift, and it's the same lesson as `natural` in Round 1. A test written by the author of the training data flatters the model.
+- **Long input refuses less.** One tagged word is enough to produce a regex, so more words may mean more chances to tag one. That's a hypothesis, not a tested cause.
+- **Seeds differ a lot here.** The same code gives 51% or 66% on prose, which the 59/60 on both seeds completely hides.
+- **Limits of this check:** It was added after the frozen results, the sentences are mostly legal text, and it counts any regex as wrong even where a sentence could loosely be read as a request. The CI treats sentences as independent, so it's too narrow.
+
+### Confidence is still not trustworthy
+
+On real requests (own dev and StructuredRegex `dev`, E7-s2), answers with confidence from .80 to .95 are right 21.6% of the time, and .95 to .99 only 14.3%. Above .99 they're right 82.7%. Confidence is low on many wrong prose answers: at threshold .6, E7-s2 would refuse 225/284 prose sentences and lose no good answers on own dev, but StructuredRegex `dev` would fall from 20 to 17. This wasn't applied, because it was noticed after the frozen results were seen.
+
 ## What's still broken
 
 Prompts below are from the shipped model, on dev or made up by hand:
 
 | Prompt | Output | Problem |
 |---|---|---|
-| `the quick brown fox` | `/brown/`, confidence .97 | Out-of-distribution input, overconfident |
-| `asdf qwer zxcv` | `/zxcv/`, confidence 1.00 | Should refuse, and sounds certain |
-| `numbers with commas as thousands separators` | `/\d+,+thousands separators/` | Not in the grammar |
+| `what time is it` | `/(?:[01]\d\|2[0-3]):[0-5]\d(?::[0-5]\d)?/`, confidence .95 | Should refuse: a question that contains a pattern word |
+| `Gray is plain text, including the spaces.` | `/ +/`, confidence .90 | Should refuse: real prose often gets through |
+| `numbers with commas as thousands separators` | `/\d+,+/` | Not in the grammar, though it passes the lenient dev check |
 | `a string of exactly ten digits` | `/\d+/` | Loses the count, cause unknown |
+| `a filename with no spaces` | `/[^ ]*/` | New in E7-s2: fails a dev check that E6-s1 passed |
 | `(ab) three times` | `/(?:\(ab\)){3}/` | No group repetition (the parentheses are literal) |
 
 ## Next
 
-**Round 2 (recommended): teach it to refuse, then measure calibration.** Add nonsense and off-topic negatives to training, then check whether a stated 90% confidence is right 90% of the time. If it works, `asdf qwer zxcv` gets "I can't read this" instead of `/zxcv/`. It's the fix users would notice most, and it teaches calibration, abstention and precision/recall trade-offs.
+**Round 3 (recommended): make real descriptions readable.** Train on StructuredRegex `train` and upgrade the compiler, items 3 and 4 below. Refusal is good enough for short input, and accuracy on real descriptions is still the biggest gap.
+
+**Parked: better refusal on prose (E8).** Add real prose from a new source to the negatives, then test a threshold around .6. The licences and article have now been read, so they count as dev data, and measuring this honestly needs prose that hasn't been looked at.
 
 **After that:**
 
@@ -250,6 +295,9 @@ Prompts below are from the shipped model, on dev or made up by hand:
 scripts/run_experiment.sh E5-s2 d4eaada 2       # on a GPU machine; SCORE_TEST=1 also scores test
 node eval/compare.mjs results/E0-s2.dev.json results/E5-s2.dev.json --show
 train/.venv/bin/python train/probe.py results/E0-s1.pt results/E5-s2.pt
+SCORE_TEST=1 scripts/run_experiment.sh E7-s2 a1882b9 2
+node eval/refuse.mjs test --threshold 0         # frozen refusal test, with the model in web/
+node eval/refuse-real.mjs /usr/share/licenses/spdx/GPL-3.0-only.txt   # any text files; the article text isn't committed
 ```
 
 Score files are in `results/`. Checkpoints (`*.pt`) aren't committed, so the `probe.py` line needs them retrained first.

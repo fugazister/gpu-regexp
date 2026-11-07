@@ -48,10 +48,15 @@ Scored by behaviour: a prompt passes if its regex matches every string it should
 | Prompts | Passed |
 |---|---:|
 | Test set (201) | 167 (83.1%, 95% CI 77.3–87.6) |
-| Dev set (60) | 57 (95%) |
-| `natural` test prompts only (45) | 20 (44%) |
-| [StructuredRegex](https://github.com/xiye17/StructuredRegex), written by other people (996 across two test splits) | 46 (4.6%) |
-| StructuredRegex, only regexes the grammar could express (159) | 16 (10.1%) |
+| Dev set (60) | 58 (96.7%) |
+| `natural` test prompts only (45) | 21 (47%) |
+| [StructuredRegex](https://github.com/xiye17/StructuredRegex), written by other people (996 across two test splits) | 43 (4.3%) |
+| StructuredRegex, only regexes the grammar could express (159) | 18 (11.3%) |
+
+| Input that isn't a request | Refused |
+|---|---:|
+| Hand-written: mash, chat, code, foreign text (60) | 59 (98%) |
+| Real prose: licences and an article (284) | 188 (66%) |
 
 Read these with care. One author wrote the first three sets and the grammar, so they aren't independent. StructuredRegex is independent, and much harder than typing a short prompt: its descriptions are long and formal, and most describe regexes this project can't express. The real answer on everyday phrasing is somewhere in between. The checks are also lenient: a prompt can pass with a regex that's broader than it should be.
 
@@ -74,21 +79,21 @@ Tagging only, median of 7 warm runs, RTX 4060 through Dawn in Node. Prompts are 
 
 | Prompts | CPU | WebGPU | Speedup |
 |---:|---:|---:|---:|
-| 1 | 0.2 ms | 1.3 ms | 0.2× |
-| 32 | 12.8 ms | 2.2 ms | 5.8× |
-| 256 | 100 ms | 7.7 ms | 13× |
-| 1,024 | 406 ms | 49 ms | 8.3× |
-| 4,096 | 1,617 ms | 129 ms | 13× |
-| 16,384 | 6,533 ms | 579 ms | 11× |
+| 1 | 0.3 ms | 1.3 ms | 0.2× |
+| 32 | 10.8 ms | 2.1 ms | 5.2× |
+| 256 | 102 ms | 10 ms | 10× |
+| 1,024 | 411 ms | 54 ms | 7.7× |
+| 4,096 | 1,641 ms | 131 ms | 13× |
+| 16,384 | 6,608 ms | 632 ms | 10× |
 
 A single prompt is faster on the CPU, so the demo normally types on the CPU despite the name. This is one machine, not a cross-device benchmark. The page's **Compare CPU and GPU** button measures yours.
 
 ## Limitations
 
-- **Natural phrasing often fails.** Only 44% of the `natural` test prompts pass, and better training data didn't change that.
+- **Natural phrasing often fails.** Only 47% of the `natural` test prompts pass, and better training data didn't change that.
 - **Coverage is the grammar and lexicon.** Thousands separators and group repetition (`(ab){3}`) aren't supported.
-- **Words it doesn't know can land in the regex.** `numbers with commas as thousands separators` gives `\d+,+thousands separators`.
-- **It doesn't refuse, and confidence can't be trusted.** `the quick brown fox` gives `/brown/` at confidence .97, and `asdf qwer zxcv` gives `/zxcv/` at 1.00. Diagnostics only cover what the compiler can detect.
+- **Words it doesn't know can land in the regex.** `numbers with commas as thousands separators` gives `\d+,+`, which drops the digits after the comma.
+- **Refusal is partial, and confidence can't be trusted.** `the quick brown fox` and `asdf qwer zxcv` now get no regex, but about a third of real prose still gets one, more often for long sentences. `what time is it` gives a time regex at confidence .95. Diagnostics only cover what the compiler can detect.
 - **Mistakes can be silent.** `a string of exactly ten digits` loses the count and gives `\d+`.
 - **Fuzzy matching doesn't catch everything.** In `digts folowed by a dahs`, `dahs` is copied as literal text.
 - **Presets are opinionated approximations**, such as email and URL. Generated patterns aren't checked for catastrophic backtracking, so don't run them on untrusted input without review.
