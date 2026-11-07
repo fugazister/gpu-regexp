@@ -1,0 +1,250 @@
+{
+"CAPTURE": [
+"a capture group of",
+"capture",
+"capture group containing",
+"capture group for",
+"capture group of",
+"capturing group of"
+],
+"CONTAINS": [
+"contain",
+"containing",
+"contains",
+"has",
+"having",
+"includes",
+"including",
+"that contain",
+"that contains",
+"which contains",
+"with"
+],
+"END": [
+"at the end",
+"at the end of the line",
+"at the end of the string",
+"ending in",
+"ending with",
+"ends in",
+"ends with",
+"finishing with",
+"has suffix",
+"suffixed with",
+"that end in",
+"that end with",
+"that ends with",
+"which ends with",
+"with suffix"
+],
+"EXT": [
+"extension",
+"file extension",
+"file with extension",
+"files with extension",
+"files with the extension"
+],
+"ICASE": [
+"case - insensitive",
+"case insensitive",
+"ignore case",
+"ignoring case",
+"in any case",
+"regardless of case"
+],
+"LINE": [
+"a line",
+"a string",
+"any line",
+"entire line",
+"line",
+"lines",
+"string",
+"strings",
+"the line",
+"the whole line"
+],
+"NEG": [
+"any characters except",
+"anything but",
+"anything except",
+"anything other than",
+"characters other than",
+"everything except",
+"no",
+"not"
+],
+"NOT_CONTAIN": [
+"does not contain",
+"doesn ' t contain",
+"excluding",
+"lacking",
+"missing",
+"not containing",
+"not having",
+"that do not contain",
+"that does not contain",
+"that doesn ' t contain",
+"that don ' t contain",
+"that has no",
+"that have no",
+"which does not contain",
+"with no",
+"without"
+],
+"NOT_END": [
+"does not end with",
+"doesn ' t end in",
+"doesn ' t end with",
+"not ending in",
+"not ending with",
+"that do not end with",
+"that does not end with",
+"that doesn ' t end with",
+"that don ' t end with"
+],
+"NOT_START": [
+"does not start with",
+"doesn ' t begin with",
+"doesn ' t start with",
+"not beginning with",
+"not starting with",
+"that do not start with",
+"that does not start with",
+"that doesn ' t start with",
+"that don ' t start with"
+],
+"ONLY": [
+"and nothing else",
+"consisting of",
+"containing only",
+"entire line is",
+"entire string is",
+"full match of",
+"just",
+"made of",
+"nothing but",
+"nothing except",
+"of only",
+"only",
+"that is",
+"that is exactly",
+"that only has",
+"whole line is",
+"whole string is",
+"with only"
+],
+"OR": [
+",",
+"and",
+"or"
+],
+"PASSWORD": [
+"password"
+],
+"Q_MAX": [
+"at most",
+"maximum",
+"maximum of",
+"no more than",
+"or fewer",
+"up to"
+],
+"Q_MIN": [
+"at least",
+"minimum",
+"minimum of",
+"no fewer than",
+"or more"
+],
+"Q_OPT": [
+"maybe a",
+"optional",
+"optionally",
+"possibly a",
+"zero or one"
+],
+"Q_PLUS": [
+"1 or more",
+"a run of",
+"a sequence of",
+"a string of",
+"any combination of",
+"any mix of",
+"at least one",
+"many",
+"multiple",
+"one or more",
+"several",
+"some"
+],
+"Q_RANGE": [
+"-",
+"and",
+"and at most",
+"at least",
+"between",
+"from",
+"or",
+"through",
+"to"
+],
+"Q_STAR": [
+"0 or more",
+"any number of",
+"if any",
+"maybe some",
+"optional",
+"zero or more"
+],
+"Q_TIMES": [
+"repeated",
+"times"
+],
+"START": [
+"at the beginning",
+"at the beginning of the string",
+"at the start",
+"at the start of the line",
+"beginning with",
+"begins with",
+"has prefix",
+"prefixed with",
+"starting with",
+"starts with",
+"that begin with",
+"that start with",
+"that starts with",
+"which starts with",
+"with prefix"
+],
+"THEN": [
+",",
+"after that",
+"and",
+"and after that",
+"and then",
+"followed by",
+"followed by a",
+"next",
+"plus",
+"then",
+"with"
+],
+"WORD": [
+"the exact word",
+"the whole word",
+"the word",
+"the words",
+"whole words",
+"word",
+"words"
+],
+"WORDS": [
+"a word",
+"all words",
+"any word",
+"word",
+"words"
+]
+}

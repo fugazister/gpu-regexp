@@ -358,6 +358,20 @@ class Gen:
         link = self.c([[], [S("and", "O")], [S(",", "O", True)], [S(",", "O", True), S("and", "O")]])
         return self.subject() + [S(v1, "START")] + a + link + [S(v2, "END")] + b, f"^{ra}.*{rb}$"
 
+    def t_start_seq_end(self):
+        """Three or more parts in order, from first to last, describe the whole string, so there's no gap before the end."""
+        parts = [self.element() for _ in range(self.r.randint(3, 5))]
+        cut = len(parts) - self.r.randint(1, 2)
+        segs, rx = self.subject() + [S(self.c(["starts with", "starting with", "begins with", "beginning with", "that starts with"]), "START")], "^"
+        for i, (e, r) in enumerate(parts):
+            if i == cut:
+                segs += words(self.c(["", "and"])) + [S(self.c(["ends with", "ending with", "ending in", "ends in"]), "END")]
+            elif i:
+                segs.append(S(self.c(JOINERS), "THEN"))
+            segs += e
+            rx += r
+        return segs, rx + "$"
+
     def t_only(self):
         e, r = self.seq(1, 3)
         k = self.r.random()
@@ -482,7 +496,7 @@ class Gen:
         segs = [N] + ([S("-", "O", True)] if glue else []) + [A, noun]
         return words(self.c(["", "a", "any"])) + segs, r"\d{%d}" % n
 
-    SHAPES = [("t_seq", 24), ("t_start", 11), ("t_end", 11), ("t_start_end", 8), ("t_only", 9), ("t_word_affix", 5),
+    SHAPES = [("t_seq", 24), ("t_start", 11), ("t_end", 11), ("t_start_end", 8), ("t_start_seq_end", 6), ("t_only", 9), ("t_word_affix", 5),
               ("t_contains", 10), ("t_alt", 7), ("t_preset", 15), ("t_password", 2), ("t_capture", 3), ("t_ext", 1),
               ("t_digit_noun", 2)]
 

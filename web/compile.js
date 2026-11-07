@@ -308,6 +308,9 @@ function assemble(clauses, flags, diagnostics) {
     if (E) return `\\w*${E}\\b`;
     if (M) return `\\w*${M}\\w*`;
   }
+  // "starts with a and ends with b" leaves a gap. Listing more parts than that describes the whole string, in order.
+  const parts = [...of("START"), ...of(null), ...of("CONTAINS"), ...of("END")].reduce((a, c) => a + c.elems.length, 0);
+  if (S && E && parts > 2) return `^${S}${M}${E}$`;
   if (S && E) return `^${S}${M && `.*${M}`}.*${E}$`;
   if (S) return `^${S}${M}`;
   if (E) return `${M}${E}$`;

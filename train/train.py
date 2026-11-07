@@ -22,26 +22,64 @@ from model import ScanTagger
 
 ROLE_ID = {r: i for i, r in enumerate(ROLES)}
 MAX_RSS_GB = 6  # abort rather than pressure a shared machine
+REAL_LABELS = os.path.join(os.path.dirname(__file__), "real_labels.jsonl")
+REAL_RATE = 0.15  # share of each batch taken from inferred labels on real descriptions
+NUM_WORDS = "one two three four five six seven eight nine ten".split()
 
 
-def make_batch(g, n):
+def load_real():
+    """Descriptions by other people, with roles inferred by train/label_real.mjs. Tokenizers must agree on them."""
+    if not os.path.exists(REAL_LABELS):
+        return []
+    real = []
+    with open(REAL_LABELS) as f:
+        for line in f:
+            s = json.loads(line)
+            toks = tokenize(s["text"])
+            if len(toks) == len(s["roles"]) and len(toks) <= MAX_TOKENS:
+                real.append((toks, s["roles"]))
+    return real
+
+
+def vary(r, toks, roles):
+    """A few hundred sentences are easy to memorise, so swap the exact counts, which the roles don't depend on.
+    Quoted literals already reach the model without their spelling, so they need no swapping."""
+    out = []
+    for t, role in zip(toks, roles):
+        t = dict(t)
+        if role == "NUM" and r.random() < 0.5:
+            text = t["text"]
+            if text.isdigit():
+                t["text"] = str(r.randint(1, 20))
+            elif text.lower() in NUM_WORDS:
+                t["text"] = r.choice(NUM_WORDS)
+            t["end"] = t["start"] + len(t["text"])
+        out.append(t)
+    return out, roles
+
+
+def make_batch(g, n, real=(), rng=None):
     rows = np.zeros((n, MAX_TOKENS, SLOTS), dtype=np.int16)
     labels = np.full((n, MAX_TOKENS), -100, dtype=np.int8)
     lengths = np.zeros(n, dtype=np.int16)
     for b in range(n):
-        s = g.sample()
-        toks = tokenize(s["text"])
+        if real and rng.random() < REAL_RATE:
+            toks, roles = vary(rng, *rng.choice(real))
+        else:
+            s = g.sample()
+            toks, roles = tokenize(s["text"]), s["roles"]
         lengths[b] = len(toks)
         rows[b, : len(toks)] = [featurize(t) for t in toks]
-        labels[b, : len(toks)] = [ROLE_ID[r] for r in s["roles"]]
+        labels[b, : len(toks)] = [ROLE_ID[r] for r in roles]
     return rows, labels, lengths
 
 
-def worker(q, fixed, seed, n):
+def worker(q, fixed, seed, n, real):
     """put() blocks while the bounded queue is full, so workers can't outrun training."""
-    g = Gen(random.Random(seed), fixed=fixed)
+    rng = random.Random(seed)
+    g = Gen(rng, fixed=fixed)
     while True:
-        q.put(make_batch(g, n))
+        q.put(make_batch(g, n, real, rng))
 
 
 def main():
@@ -63,13 +101,15 @@ def main():
     os.makedirs(a.out, exist_ok=True)
 
     fixed = build_fixed()
+    real = load_real()
+    print(f"real descriptions with inferred labels: {len(real)}", flush=True)
     model = ScanTagger(N_ROWS, len(ROLES), a.d, a.layers, a.hidden).to(a.device)
     print(f"device={a.device} params={sum(p.numel() for p in model.parameters())} roles={len(ROLES)}", flush=True)
     opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, a.lr, total_steps=a.steps, pct_start=0.05)
 
     q = mp.Queue(maxsize=2 * a.workers)
-    procs = [mp.Process(target=worker, args=(q, fixed, a.seed * 1000 + i, a.bs), daemon=True) for i in range(a.workers)]
+    procs = [mp.Process(target=worker, args=(q, fixed, a.seed * 1000 + i, a.bs, real), daemon=True) for i in range(a.workers)]
     for p in procs:
         p.start()
 
