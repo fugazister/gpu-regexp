@@ -43,6 +43,11 @@ FORMATS = {"<DATE_ISO>": ["yyyy-mm-dd", "iso", "iso 8601"], "<DATE_US>": ["mm/dd
 PLAIN_LITS = "yes no on off in out up down start stop end true false get set new old first last left right top bottom open close none".split()
 # How often training sees text that isn't a request, labelled all O so the compiler refuses it.
 NEGATIVE_RATE = 0.12
+# E10: share of samples with one or two misspelt words (was 10%, one word of five letters or more).
+TYPO_RATE = 0.25
+_ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
+KEY_NEIGHBOURS = {c: "".join(r[k] for r in _ROWS[max(0, i - 1):i + 2] for k in (j - 1, j, j + 1) if 0 <= k < len(r) and r[k] != c)
+                  for i, row in enumerate(_ROWS) for j, c in enumerate(row)}
 # Roles that can open a new sentence.
 SENTENCE_STARTS = ("THEN", "START", "END", "CONTAINS")
 SUBJECT = ["string", "strings", "line", "lines", "text", "input", "value", "values", "anything", "something",
@@ -500,21 +505,31 @@ class Gen:
               ("t_contains", 10), ("t_alt", 7), ("t_preset", 15), ("t_password", 2), ("t_capture", 3), ("t_ext", 1),
               ("t_digit_noun", 2)]
 
-    def typo(self, text, min_len=5):
-        """One edit in one long word, so the model learns that misspelt words keep their role."""
+    def typo(self, text, min_len=3):
+        """One slip in one word, so the model learns that misspelt words keep their role.
+        Covers short function words ("wiht", "adn"), the slips people make on a keyboard, and
+        words run together ("endswith"); the first letter stays put except in a swap."""
         ws = text.split(" ")
-        i = self.r.randrange(len(ws))
-        w = ws[i]
-        if len(w) < min_len or not w.isalpha():
+        if len(ws) > 1 and self.r.random() < 0.12:
+            i = self.r.randrange(len(ws) - 1)
+            return " ".join(ws[:i] + [ws[i] + ws[i + 1]] + ws[i + 2:])
+        cands = [i for i, w in enumerate(ws) if len(w) >= min_len and w.isalpha()]
+        if not cands:
             return text
-        j = self.r.randrange(1, len(w) - 1)
-        k = self.r.randint(0, 2)
-        if k == 0:
+        i = self.r.choice(cands)
+        w = ws[i]
+        k = self.r.choices(["drop", "swap", "double", "near", "insert"], [3, 3, 1, 2, 1])[0]
+        j = self.r.randrange(1, len(w))
+        if k == "drop":
             w = w[:j] + w[j + 1:]
-        elif k == 1:
+        elif k == "swap":
+            j = self.r.randrange(0, len(w) - 1) if self.r.random() < 0.15 else min(j, len(w) - 2)
             w = w[:j] + w[j + 1] + w[j] + w[j + 2:]
-        else:
+        elif k == "double":
             w = w[:j] + w[j] + w[j:]
+        else:
+            c = self.c(KEY_NEIGHBOURS.get(w[j].lower(), "e"))
+            w = w[:j] + c + w[j + (k == "near"):]
         ws[i] = w
         return " ".join(ws)
 
@@ -535,12 +550,12 @@ class Gen:
         if self.fixed is not None:
             if self.r.random() < 0.15:
                 segs.insert(self.r.randrange(len(segs) + 1), S(self.c(NOISE)))
-            if self.r.random() < 0.10:
-                i = self.r.randrange(len(segs))
-                t = segs[i]
-                if t[1] != "LIT":
-                    new = self.typo(t[0], 4 if t[1] == "NUM" else 5)
-                    has_typo = new != t[0]
+            if self.r.random() < TYPO_RATE:
+                slots = [i for i, t in enumerate(segs) if t[1] != "LIT"]
+                for i in self.r.sample(slots, min(len(slots), 2 if self.r.random() < 0.3 else 1)):
+                    t = segs[i]
+                    new = self.typo(t[0], 4 if t[1] == "NUM" else 3)
+                    has_typo = has_typo or new != t[0]
                     segs[i] = (new, t[1], t[2])
             spelled = [i for i, t in enumerate(segs) if t[1] == "NUM" and t[0].isalpha()]
             if spelled and self.r.random() < 0.10:
