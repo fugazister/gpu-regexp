@@ -50,7 +50,7 @@ Scored by behaviour: a prompt passes if its regex matches every string it should
 | Test set (201) | 166 (82.6%, 95% CI 76.7–87.2) |
 | Dev set (60) | 56 (93.3%) |
 | `natural` test prompts only (45) | 22 (49%) |
-| [StructuredRegex](https://github.com/xiye17/StructuredRegex), written by other people (996 across two test splits) | 91 (9.1%) |
+| [StructuredRegex](https://github.com/xiye17/StructuredRegex), written by other people (996 across two test splits) | 93 (9.3%) |
 | StructuredRegex, only regexes the grammar could express (159) | 41 (25.8%) |
 
 | Input that isn't a request | Refused |

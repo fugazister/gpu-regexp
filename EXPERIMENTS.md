@@ -2,9 +2,9 @@
 
 ## Status
 
-- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), Round 4 (typos), and Round 5 (relabelling). The E11-s2 model is shipped.
+- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), Round 4 (typos), Round 5 (relabelling), and Round 6 (a compiler fix; E12 not shipped). The E11-s2 model is live with the new compiler.
 - **Now:** Nothing is running.
-- **Next:** Compiler fixes for missing anchors and nested quantifiers (see [Next](#next)).
+- **Next:** Examples as a safety net (see [Next](#next)).
 
 ## Round 1: Can better training data beat the limits?
 
@@ -387,6 +387,32 @@ E11 (`5074d3b`) changes only the labels. The seeds tied on dev (`typos-dev` 28 v
 - **Something new to watch:** 2 test prompts get no regex, where E10-s2 had none, and `negation` fell from 14 to 12. Confidence also fell on several prompts in the table below.
 - **Checks:** round trip 100%, CPU parity OK, real GPU 0 role differences. A game was running on the GPU machine during that 5-second check, against the rule of not loading it then: the command printed the check instead of stopping on it. GPU commands now stop first if it's running.
 
+## Round 6: The compiler, and "consists of"
+
+**Short answer:** A one-line compiler fix shipped. E12 taught "the string consists of" as a whole-string match, and it worked on those prompts, but it didn't beat E11 overall, so it wasn't shipped.
+
+### Counts on "numbers"
+
+"number" and "numbers" are a preset meaning `\d+`, so a count wrapped the whole run: "3 numbers" gave `(?:\d+){3}`, which means three or more digits. A count on `\d+` now applies to the digit, so "3 numbers" gives `\d{3}` and "3 or more numbers" gives `\d{3,}` (`b197785`, shipped as `e0be2b8`).
+
+With the E11-s2 weights, dev didn't change except one more StructuredRegex dev answer on E11-s1. The fix changed 39 of 1,197 frozen outputs and none on the own test. Scored once: StructuredRegex 91 → 93 of 996 (2 gained, 0 lost), with own test and refusal unchanged.
+
+### E12: "the string consists of"
+
+About 20% of StructuredRegex descriptions say "the string consists of …", which means a whole-string match, and the grammar never used the phrase. E12 (`1e058d7`, branch `exp/e12`) adds "consists of", "made up of", "composed of" and similar to the grammar's whole-string leads. When a real label passes only as a whole-string match and its description uses one of those phrases, the labeller now tags the phrase as whole-string. That gave 253 labels (was 226), 37 of them with the whole-string role (was 6). Both seeds were trained on the laptop, because the GPU machine was in use.
+
+| Dev, two seeds each | E11 (new compiler) | E12 |
+|---|---:|---:|
+| StructuredRegex dev /351 | 54, 51 | 50, 59 |
+| `typos-dev` /39 | 28, 31 | 30, 27 |
+| Own dev /60 | 58, 56 | 56, 56 |
+| Non-requests refused /30 | 27, 28 | 28, 26 |
+| Real prose refused /284 | 149, 167 | 154, 151 |
+
+- **It learned the phrase.** "The string consists of 3 letters followed by 2 digits" gives `^[a-zA-Z]{3}\d{2}$`, where E11 gave no anchors.
+- **It targeted too little.** Only 2 dev descriptions were waiting on this phrase. The 29 answers that lacked only an anchor mostly use other wording.
+- **Not shipped.** The StructuredRegex gain comes from one seed (+8, against −1 for the other), and both seeds lose a little on typos and refusal. The frozen sets weren't scored for E12.
+
 ## What's still broken
 
 Prompts below are from the shipped model, on dev or made up by hand:
@@ -398,20 +424,18 @@ Prompts below are from the shipped model, on dev or made up by hand:
 | `Gray is plain text, including the spaces.` | `/Gray +/`, confidence .59 | Should refuse: real prose often gets through |
 | `numbers with commas as thousands separators` | `/\d+,+/` | Not in the grammar, though it passes the lenient dev check |
 | `a string of exactly ten digits` | `/\d+/`, confidence .40 | Loses the count, cause unknown |
-| `3 or more numbers` | `/(?:\d+){3,}/`, confidence 1.00 | Nested quantifier: "numbers" already means `\d+` |
 | `(ab) three times` | `/(?:\(ab\)){3}/` | No group repetition (the parentheses are literal) |
 
 ## Next
 
-**Round 6 (recommended): the compiler.** Relabelling has reached diminishing returns: E10 refound every old label, and most new ones needed vetting. The biggest remaining gap is cheaper to close in `web/compile.js`: 29 StructuredRegex answers only lack an anchor, and nested quantifiers like `(?:\d+){3,}` come from "3 or more numbers". Then work down the table above.
+**Round 7 (recommended): examples as a safety net.** Let the user give strings that should and shouldn't match. Then try the model's top few labellings, plus anchored versions of each, and keep the first regex that passes. This would cover the 40 frozen StructuredRegex answers that lack only an anchor, without guessing at more phrasings, and it's the best showcase left.
 
 **Parked: better refusal on prose.** Add real prose from a new source to the negatives, then test a threshold around .6. The licences and article have now been read, so they count as dev data, and measuring this honestly needs prose that hasn't been looked at.
 
 **After that:**
 
-1. **Examples as a safety net.** Generate the top few candidate regexes and test them against strings the user says should or shouldn't match. This can fix wrong answers without improving the model, and it's the best showcase in this list.
-2. **Model experiments.** Ablation of each layer, learning curves (does more data still help?), a CRF output layer, and more seeds.
-3. **LLM-paraphrased training data, verified by the compiler.** Another direct attack on `natural`. [KB13 and NL-RX-Turk](https://github.com/nicholaslocascio/deep-regex) are also available as further independent tests, once match strings are generated for them.
+1. **Model experiments.** Ablation of each layer, learning curves (does more data still help?), a CRF output layer, and more seeds.
+2. **LLM-paraphrased training data, verified by the compiler.** Another direct attack on `natural`. [KB13 and NL-RX-Turk](https://github.com/nicholaslocascio/deep-regex) are also available as further independent tests, once match strings are generated for them.
 
 ## Reproduce
 
