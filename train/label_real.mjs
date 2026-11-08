@@ -187,6 +187,9 @@ function vet(tokens, roles, c) {
 }
 
 // Labels that compile to the right regex but would teach something false about common phrases.
+// Class words next to a literal can be filler ("the letter S", "3 capital D's"); elsewhere they say what to match.
+const ATOM_WORDS = /^(digits?|numbers?|numerals?|letters?|characters?|chars?|capitals?|uppercase|lowercase|vowels?|consonants?|spaces?|symbols?)$/;
+
 function misleading(tokens, roles) {
   const low = tokens.map((t) => t.text.toLowerCase());
   const nextRole = (i) => { while (roles[++i] === "O"); return roles[i]; };
@@ -196,6 +199,16 @@ function misleading(tokens, roles) {
         !(roles[i] === roles[i + 1] && /START|END/.test(roles[i]))) return "drops an anchor";
     if (roles[i] === "Q_PLUS" && low[i] === "string" && ["NUM", "Q_MIN", "Q_MAX", "Q_RANGE", "Q_OPT", "Q_STAR"].includes(nextRole(i))) return "a string of N";
     if (roles[i] === "ONLY" && low[i] === "is" && low[i - 1] === "that" && nextRole(i) === "THEN") return "that is followed by";
+    // E11: words that carry meaning but were labelled as filler, so the label passes only by luck.
+    if (roles[i] === "NUM" && !/^\d+$/.test(low[i]) && low[i].length < 3) return "a letter read as a number";
+    // "4 more letters" means another 4, so only "more than", "or more", "at least" and the like count.
+    if (roles[i] === "O" && (low[i] === "than" || (low[i] === "least" && low[i - 1] === "at") ||
+        (/^(more|fewer|less)$/.test(low[i]) && (low[i - 1] === "or" || low[i + 1] === "than")))) return "drops a quantity word";
+    // Fine next to a literal ("the letter S"), another class word ("letters in lowercase"), a negation
+    // ("characters that are not letters"), or as "a number of".
+    if (roles[i] === "O" && ATOM_WORDS.test(low[i]) && !(low[i] === "number" && low[i + 1] === "of") &&
+        ![-2, -1, 1, 2].some((d) => roles[i + d] === "LIT" || roles[i + d] === "ATOM") &&
+        ![1, 2, 3, 4].some((d) => roles[i + d] === "NEG")) return "drops a character class";
   }
   return null;
 }
