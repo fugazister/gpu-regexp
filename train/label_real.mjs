@@ -213,6 +213,25 @@ function misleading(tokens, roles) {
   return null;
 }
 
+// E12: "the string consists of ..." means the whole string. When a label passes only as a whole-string match
+// and its description says so, tag that phrase ONLY, so the label teaches the anchors too.
+const WHOLE_PHRASES = [["consists", "only", "of"], ["is", "made", "up", "of"], ["made", "up", "of"], ["is", "composed", "of"],
+  ["composed", "of"], ["consists", "of"], ["consist", "of"], ["consisting", "of"]];
+function wholeByPhrase(tokens, roles, c) {
+  let r = compileRoles(tokens, roles, lex);
+  if (verdict(r.source, r.flags, c) !== "whole") return null;
+  const low = tokens.map((t) => t.text.toLowerCase());
+  for (let i = 0; i < low.length; i++) {
+    const p = WHOLE_PHRASES.find((p) => p.every((w, k) => low[i + k] === w && roles[i + k] === "O"));
+    if (!p) continue;
+    const next = roles.slice();
+    for (let k = 0; k < p.length; k++) next[i + k] = "ONLY";
+    r = compileRoles(tokens, next, lex);
+    return verdict(r.source, r.flags, c) === "as-produced" && vet(tokens, next, c) ? vet(tokens, next, c) : null;
+  }
+  return null;
+}
+
 async function label(c) {
   const tokens = tokenize(c.q);
   if (!tokens.length || tokens.length > MAX_TOKENS) return { why: "too long" };
@@ -262,8 +281,9 @@ async function label(c) {
   if (!vetted) return { why: "needs a role on words that don't say so" };
   const bad = misleading(tokens, vetted);
   if (bad) return { why: bad };
-  const r = compileRoles(tokens, vetted, lex);
-  return { label: { text: c.q, roles: vetted, problem: c.problem, kind: verdict(r.source, r.flags, c), changed: vetted.filter((x, i) => x !== start[i]).length, source: r.source, gold: c.spec } };
+  const final = wholeByPhrase(tokens, vetted, c) ?? vetted;
+  const r = compileRoles(tokens, final, lex);
+  return { label: { text: c.q, roles: final, problem: c.problem, kind: verdict(r.source, r.flags, c), changed: vetted.filter((x, i) => x !== start[i]).length, source: r.source, gold: c.spec } };
 }
 
 // ---- run ----

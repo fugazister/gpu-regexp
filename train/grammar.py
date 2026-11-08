@@ -384,7 +384,12 @@ class Gen:
             return e + [S(self.c(["and nothing else", "only"]), "ONLY")], f"^{r}$"
         lead = self.c(["only", "just", "nothing but", "containing only", "with only", "consisting of", "made of", "entire string is",
                        "whole string is", "whole line is", "full match of", "entire line is", "of only", "that is", "that only has", "nothing except"])
-        return (self.subject() if k < 0.6 else []) + [S(lead, "ONLY")] + e, f"^{r}$"
+        if k < 0.45:
+            # E12: real descriptions say "the string consists of ..." for a whole-string match, and the grammar never did.
+            subj = self.c(["the string", "a string", "string", "the text", "the input", "the line", "it", "the value", ""])
+            lead = self.c(["consists of", "consist of", "consists only of", "is made up of", "made up of", "is composed of", "composed of", "consisting of"])
+            return words(subj) + [S(lead, "ONLY")] + e, f"^{r}$"
+        return (self.subject() if k < 0.7 else []) + [S(lead, "ONLY")] + e, f"^{r}$"
 
     def t_word_affix(self):
         w = self.lit_word()
