@@ -91,6 +91,8 @@ function renderElem(e, standalone) {
   if (e.ext && !s.startsWith("\\.")) s = "\\." + s;
   if (e.word) return `\\b${e.alts ? `(?:${s})` : s}\\b${e.quant ?? ""}`;
   if (e.alts && !standalone) s = `(?:${s})`;
+  // "3 numbers" means three digits: a count on \d+ applies to the digit, not to runs of digits.
+  if (s === "\\d+" && !e.alts && /^(\+|\*|\{[\d,]+\})$/.test(e.quant ?? "")) return "\\d" + e.quant;
   if (e.quant && e.group) s = `(?:${s})`;
   return s + (e.quant ?? "");
 }
