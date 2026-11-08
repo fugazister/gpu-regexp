@@ -2,9 +2,9 @@
 
 ## Status
 
-- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), and Round 3 (real descriptions). The E9-s2 model is shipped.
+- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), and Round 4 (typos). The E10-s2 model is shipped.
 - **Now:** Nothing is running.
-- **Next:** Win back typo handling, which Round 3 made worse (see [Next](#next)).
+- **Next:** Relabel real descriptions with E10 to use more of them (see [Next](#next)).
 
 ## Round 1: Can better training data beat the limits?
 
@@ -318,22 +318,59 @@ Reading 30 of the final labels by hand found 3 with a small error, such as `3 to
 - **Most reachable descriptions still aren't used.** 192 of 725 is 26%. Relabelling with E9 could find more, because a better model starts closer to the answer.
 - **29 more correct answers only lack an anchor.** Forgiving a missing anchor gives 122 instead of 93, so the model reads those descriptions correctly and the regex just isn't tied to the whole string.
 
+## Round 4: Typos
+
+**Short answer:** Typos were weak all along, not only after E9, and E10 fixes most of the gap. It may cost a little elsewhere, which can't be told apart from seed noise yet.
+
+### The dev set showed an old gap
+
+A new dev set (`eval/typos-dev.json`, 39 prompts) gives each misspelt prompt a correctly spelt twin (`eval/typos-dev-clean.json`). Missing a twin means the model can't do that prompt at all, and missing only the typo version means the typo cost it.
+
+| Model | Typo prompts /39 | Clean twins /39 |
+|---|---:|---:|
+| E7-s1, E7-s2 | 23, 22 | 35, 35 |
+| E9-s1, E9-s2 | 22, 18 | 36, 35 |
+| **E10-s1, E10-s2** | **30, 29** | 36, 35 |
+
+E7 and E9 lose about 14 prompts to typos, so most of the 18 → 11 drop on the test set was seed noise on top of a gap that was already there. Reading the roles showed the cause: the tagger labels the misspelt word as filler (`numbrs/O`, `begins/START wiht/O abc/O`, `a tiem like 12:30` all `O`). When the role is right, the lexicon already fixes the spelling (`leters` → letters).
+
+The grammar explained it. Only 10% of samples had a typo, always in one word of five letters or more, and only from three kinds of edit. So `with`, `two`, `and`, `date` and `time` were never misspelt, and keyboard slips or words run together (`endswith`) never appeared.
+
+### E10: more kinds of typos
+
+E10 (`ede75ca`) puts typos in 25% of samples, with one or two words, three letters or more. The new edits are keyboard-neighbour substitutions, inserted letters, swaps that include the first letter, and words run together. Nothing else changed.
+
+| | E9-s2 (was live) | E10-s2 (shipped) |
+|---|---:|---:|
+| `typos` /20 (frozen) | 11 | **18** |
+| Own test /201 (frozen) | 165 | 167 (11 gained, 9 lost, p=0.82) |
+| `natural` /45 (frozen) | 24 | 22 |
+| StructuredRegex `teste`+`testi` /996 (frozen) | 93 | 84 (`teste` 5/9, p=0.42; `testi` 7/12, p=0.36) |
+| Non-requests refused /60 (frozen) | 58 | 55 |
+| Real prose refused /284 | 169 | 164 |
+
+- **The seed was chosen on dev.** E10-s2 scored 29 against 30 on typo dev, 51 against 47 on StructuredRegex dev, and refused 29/30 against 28/30, so it was picked before the frozen sets were scored.
+- **The typo gain is clear.** Both seeds gain about 9 on typo dev with no change on the clean twins, and the frozen `typos` went from 11 to 18. `digts folowed by a dahs` now gives `/\d+/` (the dash is still lost).
+- **The losses aren't significant, and they may be real.** Averaged over seeds on dev, E9 and E10 are within one prompt on StructuredRegex (50 vs 49), own dev (57.5 vs 56.5) and refusal. E9-s2 was also the luckier of its seeds. The frozen StructuredRegex drop leans the wrong way, though, and a third seed would show whether it's noise.
+- **Prose refusal drops in both seeds.** E9 averaged 167 of 284 and E10 averages 155 (146 and 164). One possible cause, not tested: ordinary prose with misspellings now looks more like keywords.
+
 ## What's still broken
 
 Prompts below are from the shipped model, on dev or made up by hand:
 
 | Prompt | Output | Problem |
 |---|---|---|
-| `digts folowed by a dahs` | `/dahs/`, confidence .92 | New in E9: typos now often lose the rest of the prompt |
-| `a filename with no spaces` | `/^(?!.*[^ ]*).*$/`, confidence .49 | A wrong negation that matches almost nothing |
-| `Gray is plain text, including the spaces.` | `/ +/`, confidence .97 | Should refuse: real prose often gets through |
+| `digts folowed by a dahs` | `/\d+/`, confidence .86 | Better since E10 (was `/dahs/`), but a misspelt atom at the end still drops out |
+| `a filename with no spaces` | `/filename[^ ]*/`, confidence .81 | Reads "filename" as text and loses "no" |
+| `Gray is plain text, including the spaces.` | `/ +/`, confidence .94 | Should refuse: real prose often gets through |
 | `numbers with commas as thousands separators` | `/\d+,+/` | Not in the grammar, though it passes the lenient dev check |
-| `a string of exactly ten digits` | `/\d+/`, confidence 1.00 | Loses the count, cause unknown |
+| `a string of exactly ten digits` | `/\d+/`, confidence .93 | Loses the count, cause unknown |
+| `3 or more numbers` | `/(?:\d+){3,}/`, confidence 1.00 | Nested quantifier: "numbers" already means `\d+` |
 | `(ab) three times` | `/(?:\(ab\)){3}/` | No group repetition (the parentheses are literal) |
 
 ## Next
 
-**Round 4 (recommended): win back typos, then reach more descriptions.** Write typo prompts for dev, since it has too few to show the problem, and add typos to the real descriptions during training. Then relabel with E9 to use more of the 725, and work down the compiler table below.
+**Round 5 (recommended): reach more descriptions.** Relabel with E10 to use more of the 725 reachable descriptions (192 are used now), and work down the compiler table above. A third E10 seed would also show whether the StructuredRegex drop is noise.
 
 **Parked: better refusal on prose.** Add real prose from a new source to the negatives, then test a threshold around .6. The licences and article have now been read, so they count as dev data, and measuring this honestly needs prose that hasn't been looked at.
 
@@ -352,6 +389,8 @@ train/.venv/bin/python train/probe.py results/E0-s1.pt results/E5-s2.pt
 SCORE_TEST=1 scripts/run_experiment.sh E7-s2 aa3b9a5 2
 node eval/refuse.mjs test --threshold 0         # frozen refusal test, with the model in web/
 SCORE_TEST=1 scripts/run_experiment.sh E9-s2 593157a 2
+SCORE_TEST=1 scripts/run_experiment.sh E10-s2 ede75ca 2
+node eval/score.mjs eval/typos-dev.json; node eval/score.mjs eval/typos-dev-clean.json
 node train/label_real.mjs train/real_labels.jsonl   # needs StructuredRegex train.tsv in eval/external/streg/
 node eval/refuse-real.mjs /usr/share/licenses/spdx/GPL-3.0-only.txt   # any text files; the article text isn't committed
 ```
