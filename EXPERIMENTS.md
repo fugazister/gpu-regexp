@@ -2,9 +2,9 @@
 
 ## Status
 
-- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), and Round 4 (typos). The E10-s2 model is shipped.
+- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), Round 4 (typos), and Round 5 (relabelling). The E11-s2 model is shipped.
 - **Now:** Nothing is running.
-- **Next:** Relabel real descriptions with E10 to use more of them (see [Next](#next)).
+- **Next:** Compiler fixes for missing anchors and nested quantifiers (see [Next](#next)).
 
 ## Round 1: Can better training data beat the limits?
 
@@ -354,23 +354,56 @@ E10 (`ede75ca`) puts typos in 25% of samples, with one or two words, three lette
 - **The losses aren't significant, and they may be real.** Averaged over seeds on dev, E9 and E10 are within one prompt on StructuredRegex (50 vs 49), own dev (57.5 vs 56.5) and refusal. E9-s2 was also the luckier of its seeds. The frozen StructuredRegex drop leans the wrong way, though, and a third seed would show whether it's noise.
 - **Prose refusal drops in both seeds.** E9 averaged 167 of 284 and E10 averages 155 (146 and 164). One possible cause, not tested: ordinary prose with misspellings now looks more like keywords.
 
+## Round 5: Relabelling with a better model
+
+**Short answer:** Starting the label search from E10 found 45 more labels, but reading them showed many were right only by luck. With stricter checks, E11 wins back most of what E10 lost on StructuredRegex and keeps the typo gain.
+
+### More labels, and more luck
+
+Starting from E10, the search found every old label again with the same roles, plus 45 new ones. Many of the new ones passed only by luck:
+
+- `[r/NUM] lowercase letters`: a letter tagged as a count.
+- `more than [3] [numbers]` gives `(?:\d+){3}`: the gold regex is just as sloppy, so the label passes while teaching that "more than" is filler.
+- `2 or more digits . However they can [not] be [Capital Letters]`: "digits" left as filler, and `[^A-Z]` happens to match.
+- `any combination of letters, special characters, or digits`: "digits" left as filler, and the `.` covers it.
+
+Three checks now drop such labels: a tag of NUM on a one- or two-letter word, a quantity phrase left as filler ("more than", "or more", "at least"), and a class word left as filler with no literal, class word or negation next to it. The first version also dropped "4 more letters" (meaning another four), "characters that are not letters", "a number of" and "letters in lowercase", which cut 21 good old labels. After narrowing, 5 old labels go, all for good reason. The result is 226 labels over 139 regexes (was 192 over 127).
+
+### E11
+
+E11 (`5074d3b`) changes only the labels. The seeds tied on dev (`typos-dev` 28 vs 31, own dev 58 vs 56, StructuredRegex dev 53 vs 51, refusal 27 vs 28 of 30), so real prose (149 vs 167 of 284) picked E11-s2 before the frozen sets were scored.
+
+| Frozen sets, scored once | E9-s2 | E10-s2 | **E11-s2 (shipped)** |
+|---|---:|---:|---:|
+| StructuredRegex `teste`+`testi` /996 | 93 | 84 | **91** |
+| StructuredRegex in scope /159 | 40 | 36 | **41** |
+| `typos` /20 | 11 | 18 | **18** |
+| Own test /201 | 165 | 167 | 166 |
+| Non-requests refused /60 | 58 | 55 | 56 |
+| Real prose refused /284 | 169 | 164 | 167 |
+
+- **Not significant on its own.** Against E10-s2, `teste` is 4 gained and 4 lost, `testi` 18 gained and 11 lost (p=0.26), and own test 4 gained and 5 lost (p=1.0). The direction matches dev, where the E11 seeds average 52 on StructuredRegex and E10 averages 49.
+- **Averaged over seeds, E10's possible cost is mostly gone.** E11 matches E10 on typo dev (29.5) and own dev (57 vs 56.5), with prose at 158 vs 155 and refusal dev at 27.5 vs 28.5.
+- **Something new to watch:** 2 test prompts get no regex, where E10-s2 had none, and `negation` fell from 14 to 12. Confidence also fell on several prompts in the table below.
+- **Checks:** round trip 100%, CPU parity OK, real GPU 0 role differences. A game was running on the GPU machine during that 5-second check, against the rule of not loading it then: the command printed the check instead of stopping on it. GPU commands now stop first if it's running.
+
 ## What's still broken
 
 Prompts below are from the shipped model, on dev or made up by hand:
 
 | Prompt | Output | Problem |
 |---|---|---|
-| `digts folowed by a dahs` | `/\d+/`, confidence .86 | Better since E10 (was `/dahs/`), but a misspelt atom at the end still drops out |
-| `a filename with no spaces` | `/filename[^ ]*/`, confidence .81 | Reads "filename" as text and loses "no" |
-| `Gray is plain text, including the spaces.` | `/ +/`, confidence .94 | Should refuse: real prose often gets through |
+| `digts folowed by a dahs` | `/\d+/`, confidence .76 | Better since E10 (was `/dahs/`), but a misspelt atom at the end still drops out |
+| `a filename with no spaces` | `/[^ ]*/`, confidence .62 | Loses the anchors: should be `^[^ ]*$` |
+| `Gray is plain text, including the spaces.` | `/Gray +/`, confidence .59 | Should refuse: real prose often gets through |
 | `numbers with commas as thousands separators` | `/\d+,+/` | Not in the grammar, though it passes the lenient dev check |
-| `a string of exactly ten digits` | `/\d+/`, confidence .93 | Loses the count, cause unknown |
+| `a string of exactly ten digits` | `/\d+/`, confidence .40 | Loses the count, cause unknown |
 | `3 or more numbers` | `/(?:\d+){3,}/`, confidence 1.00 | Nested quantifier: "numbers" already means `\d+` |
 | `(ab) three times` | `/(?:\(ab\)){3}/` | No group repetition (the parentheses are literal) |
 
 ## Next
 
-**Round 5 (recommended): reach more descriptions.** Relabel with E10 to use more of the 725 reachable descriptions (192 are used now), and work down the compiler table above. A third E10 seed would also show whether the StructuredRegex drop is noise.
+**Round 6 (recommended): the compiler.** Relabelling has reached diminishing returns: E10 refound every old label, and most new ones needed vetting. The biggest remaining gap is cheaper to close in `web/compile.js`: 29 StructuredRegex answers only lack an anchor, and nested quantifiers like `(?:\d+){3,}` come from "3 or more numbers". Then work down the table above.
 
 **Parked: better refusal on prose.** Add real prose from a new source to the negatives, then test a threshold around .6. The licences and article have now been read, so they count as dev data, and measuring this honestly needs prose that hasn't been looked at.
 
@@ -391,6 +424,7 @@ node eval/refuse.mjs test --threshold 0         # frozen refusal test, with the 
 SCORE_TEST=1 scripts/run_experiment.sh E9-s2 593157a 2
 SCORE_TEST=1 scripts/run_experiment.sh E10-s2 ede75ca 2
 node eval/score.mjs eval/typos-dev.json; node eval/score.mjs eval/typos-dev-clean.json
+SCORE_TEST=1 scripts/run_experiment.sh E11-s2 5074d3b 2
 node train/label_real.mjs train/real_labels.jsonl   # needs StructuredRegex train.tsv in eval/external/streg/
 node eval/refuse-real.mjs /usr/share/licenses/spdx/GPL-3.0-only.txt   # any text files; the article text isn't committed
 ```

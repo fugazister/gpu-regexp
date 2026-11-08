@@ -47,16 +47,16 @@ Scored by behaviour: a prompt passes if its regex matches every string it should
 
 | Prompts | Passed |
 |---|---:|
-| Test set (201) | 167 (83.1%, 95% CI 77.3–87.6) |
+| Test set (201) | 166 (82.6%, 95% CI 76.7–87.2) |
 | Dev set (60) | 56 (93.3%) |
 | `natural` test prompts only (45) | 22 (49%) |
-| [StructuredRegex](https://github.com/xiye17/StructuredRegex), written by other people (996 across two test splits) | 84 (8.4%) |
-| StructuredRegex, only regexes the grammar could express (159) | 36 (22.6%) |
+| [StructuredRegex](https://github.com/xiye17/StructuredRegex), written by other people (996 across two test splits) | 91 (9.1%) |
+| StructuredRegex, only regexes the grammar could express (159) | 41 (25.8%) |
 
 | Input that isn't a request | Refused |
 |---|---:|
-| Hand-written: mash, chat, code, foreign text (60) | 55 (92%) |
-| Real prose: licences and an article (284) | 164 (58%) |
+| Hand-written: mash, chat, code, foreign text (60) | 56 (93%) |
+| Real prose: licences and an article (284) | 167 (59%) |
 
 Read these with care. One author wrote the first three sets and the grammar, so they aren't independent. StructuredRegex is independent, and much harder than typing a short prompt: its descriptions are long and formal, and most describe regexes this project can't express. The real answer on everyday phrasing is somewhere in between. The checks are also lenient: a prompt can pass with a regex that's broader than it should be.
 
@@ -93,7 +93,7 @@ A single prompt is faster on the CPU, so the demo normally types on the CPU desp
 - **Natural phrasing often fails.** Only 49% of the `natural` test prompts pass.
 - **Coverage is the grammar and lexicon.** Thousands separators and group repetition (`(ab){3}`) aren't supported.
 - **Words it doesn't know can land in the regex.** `numbers with commas as thousands separators` gives `\d+,+`, which drops the digits after the comma.
-- **Refusal is partial, and confidence can't be trusted.** `the quick brown fox` and `asdf qwer zxcv` get no regex, but about 42% of real prose still gets one, more often for long sentences. Diagnostics only cover what the compiler can detect.
+- **Refusal is partial, and confidence can't be trusted.** `the quick brown fox` and `asdf qwer zxcv` get no regex, but about 41% of real prose still gets one, more often for long sentences. Diagnostics only cover what the compiler can detect.
 - **Mistakes can be silent.** `a string of exactly ten digits` loses the count and gives `\d+`.
 - **Typos still cost some prompts.** 18 of 20 typo test prompts pass, but `digts folowed by a dahs` still drops the dash and gives `\d+`.
 - **Presets are opinionated approximations**, such as email and URL. Generated patterns aren't checked for catastrophic backtracking, so don't run them on untrusted input without review.
