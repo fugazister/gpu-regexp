@@ -67,6 +67,13 @@
   table { border-collapse: collapse; font: 13px var(--mono); margin-top: 8px; width: 100%; }
   th, td { padding: 3px 12px 3px 0; text-align: right; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
   th:first-child, td:first-child { text-align: left; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .pair label { margin-top: 14px; }
+  .pair textarea { min-height: 64px; }
+  @media (max-width: 520px) { .pair { grid-template-columns: 1fr; gap: 0; } }
+  #fit { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
+  #fit.ok { color: var(--accent); }
+  #fit.bad { color: var(--err); }
   footer { margin-top: 36px; border-top: 1px solid var(--line); padding-top: 14px; font-size: 13px; color: var(--muted); }
 </style>
 </head>
@@ -79,9 +86,15 @@
   <input id="q" autocomplete="off" spellcheck="false" value="starts with a capital letter and ends with a period">
   <div class="chips" id="examples"></div>
 
+  <div class="pair">
+    <div><label for="yes">Should match (optional, one per line)</label><textarea id="yes" rows="2" spellcheck="false" placeholder="Hello there."></textarea></div>
+    <div><label for="no">Shouldn't match (optional)</label><textarea id="no" rows="2" spellcheck="false" placeholder="not this one."></textarea></div>
+  </div>
+
   <div class="label">Regex</div>
   <div class="result"><code id="re" aria-live="polite">loading model…</code><button id="copy">Copy</button></div>
   <ul id="diag"></ul>
+  <p id="fit" hidden></p>
 
   <div class="label">How your words were read</div>
   <div id="spans"></div>
@@ -137,7 +150,8 @@ async function run() {
   if (!parser) return;
   const ticket = ++latest, t0 = performance.now(), choice = $("backend").value;
   let r;
-  try { r = await parser.parse($("q").value, { backend: choice }); }
+  const lines = (id) => $(id).value.split("\n").filter((s) => s !== "");
+  try { r = await parser.parseWithExamples($("q").value, { yes: lines("yes"), no: lines("no") }, { backend: choice }); }
   catch (e) {
     $("re").className = "bad";
     $("re").textContent = e.message;
@@ -150,6 +164,14 @@ async function run() {
   $("diag").replaceChildren(...r.diagnostics.map((d) => el("li", { textContent: d })));
   $("spans").replaceChildren(...r.spans.map((s) => el("span", { className: `span ${KIND(s.role)}` },
     s.text, ...(s.role === "O" ? [] : [el("small", { textContent: s.role })]))));
+  const fit = $("fit"), ex = r.examples;
+  fit.hidden = !ex;
+  if (ex) {
+    fit.className = ex.fit ? "ok" : "bad";
+    fit.textContent = ex.fit
+      ? (ex.rank ? `Your examples changed the answer: it's reading ${ex.rank + 1} of the ones tried.` : ex.tried > 1 ? "Your examples added anchors." : "Fits all your examples.")
+      : `No reading fits all your examples (${ex.tried} tried). Wrong on: ${ex.failing.map((s) => JSON.stringify(s)).join(", ")}`;
+  }
   current = r.regexp ? r : null;
   paint();
   const pct = Math.round(r.confidence * 100);
@@ -159,6 +181,8 @@ async function run() {
 
 $("q").oninput = run;
 $("backend").onchange = run;
+$("yes").oninput = run;
+$("no").oninput = run;
 $("text").oninput = paint;
 $("copy").onclick = async () => {
   if (!current) return;

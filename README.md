@@ -24,6 +24,12 @@ r.diagnostics; // what it had to guess at or couldn't read
 r.confidence;  // softmax probability of the least certain word
 
 await gr.parseMany(prompts); // batches; uses WebGPU from 32 prompts up
+
+// With strings that should and shouldn't match, it tries the 64 most likely readings,
+// as written and anchored, and returns the most likely regex that gets them all right.
+const e = await gr.parseWithExamples("three digits", { yes: ["123"], no: ["1234"] });
+e.source;      // "^(?:\\d{3})$"
+e.examples;    // { fit: true, tried, rank }, or { fit: false, failing: [...] }
 ```
 
 ## How it works
@@ -39,7 +45,7 @@ await gr.parseMany(prompts); // batches; uses WebGPU from 32 prompts up
 2. **Tag (WebGPU or CPU).** Summed embeddings, two layers of gated bidirectional scans, a 5-tap convolution, and a two-layer head. Weights are int6, trained with fake quantization.
 3. **Compile (CPU).** `web/compile.js` holds all the regex semantics. A 387-form lexicon decides what an `ATOM` span means, tolerating small typos. The model never writes regex text, so its mistakes produce a wrong regex, not an invalid one.
 
-Training data comes from a grammar (`train/grammar.py`) that emits labels and a gold regex built independently of the compiler. It also includes 192 real descriptions from StructuredRegex, whose word labels were inferred by searching for roles that compile to a regex behaving like the dataset's own (`train/label_real.mjs`).
+Training data comes from a grammar (`train/grammar.py`) that emits labels and a gold regex built independently of the compiler. It also includes 226 real descriptions from StructuredRegex, whose word labels were inferred by searching for roles that compile to a regex behaving like the dataset's own (`train/label_real.mjs`).
 
 ## Results
 
@@ -52,6 +58,16 @@ Scored by behaviour: a prompt passes if its regex matches every string it should
 | `natural` test prompts only (45) | 22 (49%) |
 | [StructuredRegex](https://github.com/xiye17/StructuredRegex), written by other people (996 across two test splits) | 93 (9.3%) |
 | StructuredRegex, only regexes the grammar could express (159) | 41 (25.8%) |
+
+Giving examples helps more than any training change so far. On StructuredRegex's test splits, each description's strings were split: some went to `parseWithExamples`, and only the others decided pass or fail.
+
+| StructuredRegex test splits (996), scored on held-out strings | Passed |
+|---|---:|
+| Description only | 125 (12.6%) |
+| Plus 1 string that should match and 1 that shouldn't | 209 (21.0%) |
+| Plus 3 of each | 224 (22.5%) |
+
+The description-only score is 125 here, not 93, because only the held-out strings are checked, and fewer strings let more regexes pass.
 
 | Input that isn't a request | Refused |
 |---|---:|

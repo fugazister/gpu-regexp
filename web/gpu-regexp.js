@@ -27,6 +27,57 @@ function softmaxMax(logits, at, n) {
   return { best, p: 1 / sum };
 }
 
+export const READINGS = 64;
+
+/** Labellings in order of probability: each word's role is picked from its few most likely, best total first. */
+export function* readings(tagged, roleNames, limit = READINGS) {
+  const opts = tagged.map((t) => t.lp.map((lp, k) => ({ role: roleNames[k], lp })).sort((a, b) => b.lp - a.lp)
+    .filter((o, j) => j === 0 || o.lp > -7).slice(0, 3));
+  const score = (ranks) => ranks.reduce((a, r, i) => a + opts[i][r].lp, 0);
+  const start = tagged.map(() => 0);
+  const queue = [{ ranks: start, s: score(start) }], seen = new Set([start.join()]);
+  for (let n = 0; n < limit && queue.length; n++) {
+    let bi = 0;
+    for (let i = 1; i < queue.length; i++) if (queue[i].s > queue[bi].s) bi = i;
+    const { ranks, s } = queue.splice(bi, 1)[0];
+    yield { roles: ranks.map((r, i) => opts[i][r].role), lp: s };
+    for (let i = 0; i < ranks.length; i++) {
+      if (ranks[i] + 1 >= opts[i].length) continue;
+      const next = ranks.slice(); next[i]++;
+      if (seen.has(next.join())) continue;
+      seen.add(next.join());
+      queue.push({ ranks: next, s: score(next) });
+    }
+  }
+}
+
+/** The first reading, as written or then anchored, whose regex passes `fits`. */
+export function searchReadings(tokens, tagged, roleNames, lexicon, fits) {
+  let rank = 0, tried = 0;
+  const seen = new Set();
+  for (const { roles } of readings(tagged, roleNames)) {
+    const out = compileRoles(tokens, roles, lexicon);
+    const s = out.source;
+    if (s !== null && !seen.has(s)) {
+      seen.add(s);
+      const variants = [[s, null]];
+      const starts = s.startsWith("^"), ends = s.endsWith("$") && !s.endsWith("\\$");
+      const body = s.slice(starts ? 1 : 0, ends ? -1 : undefined);
+      if (!starts || !ends) variants.push([`^(?:${body})$`, "anchored to the whole string, to fit the examples"]);
+      if (!starts) variants.push([`^(?:${s})`, "anchored at the start, to fit the examples"]);
+      if (!ends) variants.push([`(?:${s})$`, "anchored at the end, to fit the examples"]);
+      for (const [src, wrap] of variants) {
+        let re;
+        try { re = new RegExp(src, out.flags); } catch { continue; }
+        tried++;
+        if (fits(re)) return { found: { roles, source: re.source, wrap, rank }, tried };
+      }
+    }
+    rank++;
+  }
+  return { found: null, tried };
+}
+
 export function createParser(spec, lexicon, backends) {
   const prog = compileProgram(spec, SLOTS);
 
@@ -39,8 +90,12 @@ export function createParser(spec, lexicon, backends) {
     });
     const logits = await backend.run(prog, rows, lengths, T);
     return tokenLists.map((toks, q) => toks.map((_, i) => {
-      const { best, p } = softmaxMax(logits, (q * T + i) * prog.nRoles, prog.nRoles);
-      return { role: spec.roles[best], p };
+      const at = (q * T + i) * prog.nRoles;
+      const { best, p } = softmaxMax(logits, at, prog.nRoles);
+      // Every role's log-probability, so examples can pick among less likely readings without rerunning the model.
+      const row = Array.from(logits.subarray(at, at + prog.nRoles));
+      const mx = Math.max(...row), lse = mx + Math.log(row.reduce((a, x) => a + Math.exp(x - mx), 0));
+      return { role: spec.roles[best], p, lp: row.map((x) => x - lse) };
     }));
   }
 
@@ -77,10 +132,39 @@ export function createParser(spec, lexicon, backends) {
     return results.map((r) => ({ ...r, backend: used.name }));
   }
 
+  /**
+   * Like parse, but with strings that should (yes) and shouldn't (no) match. Tries the most likely readings
+   * of the prompt, each as written and anchored, and returns the most likely regex that gets every example right.
+   * With no examples, or when nothing fits, it's the plain parse plus a note on which examples fail.
+   */
+  async function parseWithExamples(text, { yes = [], no = [] } = {}, opts = {}) {
+    const [plain] = await parseMany([text], opts);
+    yes = yes.filter((s) => s !== ""); no = no.filter((s) => s !== "");
+    if (!yes.length && !no.length) return plain;
+    const tokens = plain.tokens;
+    const fits = (re) => yes.every((s) => re.test(s)) && no.every((s) => !re.test(s));
+    if (plain.regexp && fits(plain.regexp)) return { ...plain, examples: { fit: true, tried: 1 } };
+    const tagged = tokens.length ? (await tag([tokens], pick(opts.backend ?? "auto", 1)))[0] : [];
+    const { found, tried } = searchReadings(tokens, tagged, spec.roles, lexicon, fits);
+    if (!found) {
+      const failing = [...yes.filter((s) => !plain.regexp?.test(s)), ...no.filter((s) => !!plain.regexp?.test(s))];
+      return { ...plain, examples: { fit: false, tried, failing } };
+    }
+    found.tried = tried;
+    const out = finish(tokens, found.roles.map((role, i) => ({ role, p: Math.exp(tagged[i].lp[spec.roles.indexOf(role)]) })), false);
+    if (found.wrap) {
+      out.source = found.source; out.regexp = new RegExp(found.source, out.flags);
+      out.diagnostics.push(found.wrap);
+    }
+    if (found.rank) out.diagnostics.push(`picked reading ${found.rank + 1} of ${READINGS}, the most likely one that fits the examples`);
+    return { ...out, backend: plain.backend, examples: { fit: true, tried: found.tried, rank: found.rank } };
+  }
+
   return {
     backends,
     parseMany,
     parse: async (text, opts) => (await parseMany([text], opts))[0],
+    parseWithExamples,
     tag,
   };
 }

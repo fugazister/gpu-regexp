@@ -2,9 +2,9 @@
 
 ## Status
 
-- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), Round 4 (typos), Round 5 (relabelling), and Round 6 (a compiler fix; E12 not shipped). The E11-s2 model is live with the new compiler.
+- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), Round 4 (typos), Round 5 (relabelling), Round 6 (a compiler fix; E12 not shipped), and Round 7 (examples as a safety net). The E11-s2 model is live with the new compiler and example boxes.
 - **Now:** Nothing is running.
-- **Next:** Examples as a safety net (see [Next](#next)).
+- **Next:** Better refusal on real prose (see [Next](#next)).
 
 ## Round 1: Can better training data beat the limits?
 
@@ -413,6 +413,30 @@ About 20% of StructuredRegex descriptions say "the string consists of …", whic
 - **It targeted too little.** Only 2 dev descriptions were waiting on this phrase. The 29 answers that lacked only an anchor mostly use other wording.
 - **Not shipped.** The StructuredRegex gain comes from one seed (+8, against −1 for the other), and both seeds lose a little on typos and refusal. The frozen sets weren't scored for E12.
 
+## Round 7: Examples as a safety net
+
+**Short answer:** Letting the user give a few strings that should and shouldn't match helps more than any training change so far, and the model doesn't change at all.
+
+### How it works
+
+The tagger already gives every role's probability for each word. `parseWithExamples` lists the 64 most likely labellings in order (each word picks from its three most likely roles). It compiles each one and tries it as written, anchored to the whole string, anchored at the start, then at the end. It returns the first regex that gets every example right. Without examples, or when nothing fits, it returns the plain parse and lists the examples that fail.
+
+### Measuring it honestly
+
+The examples must not grade themselves. `eval/examples.mjs` splits each StructuredRegex description's strings: the first 1 or 3 of each kind go to the picker, and only the last 3 decide pass or fail. The plain parse is scored on the same last 3, so its score here (57 on dev) is higher than the usual 51, which checks every string.
+
+| StructuredRegex, scored on held-out strings | dev /351 | `teste`+`testi` /996 (frozen, scored once) |
+|---|---:|---:|
+| Description only | 57 | 125 |
+| Plus 1 + 1 examples | 77 (20 gained, 0 lost) | 209 (93 gained, 9 lost) |
+| **Plus 3 + 3 examples** | **86** (29 gained, 0 lost) | **224** (100 gained, 1 lost) |
+
+- **What it fixes, from reading dev:** missing anchors; less likely roles the tagger nearly chose (`characters that aren't capital letters` → `[^A-Z]{4}` instead of `(?:aren){4}`); and typos (`digts folowed by a dahs` → `\d+-`, reading 2).
+- **Where it can hurt:** with 1 + 1 examples, 9 frozen answers that were right became wrong, because a less likely reading fits the two examples but not the held-out strings. With 3 + 3 that falls to 1.
+- **64 readings is enough.** On dev, 16 readings gave 81 and 256 gave 87, against 86 for 64.
+- **It can't fix what no reading can express.** When nothing fits, the page says so and shows which examples fail.
+- **Overfitting to examples is real.** Some fixes pass the held-out strings while still reading the description loosely, for example `(?:[^\w\s]|[a-z])5` for "special characters, lowercase letters, or the number 5".
+
 ## What's still broken
 
 Prompts below are from the shipped model, on dev or made up by hand:
@@ -428,9 +452,7 @@ Prompts below are from the shipped model, on dev or made up by hand:
 
 ## Next
 
-**Round 7 (recommended): examples as a safety net.** Let the user give strings that should and shouldn't match. Then try the model's top few labellings, plus anchored versions of each, and keep the first regex that passes. This would cover the 40 frozen StructuredRegex answers that lack only an anchor, without guessing at more phrasings, and it's the best showcase left.
-
-**Parked: better refusal on prose.** Add real prose from a new source to the negatives, then test a threshold around .6. The licences and article have now been read, so they count as dev data, and measuring this honestly needs prose that hasn't been looked at.
+**Round 8 (recommended): better refusal on prose.** It was parked twice, and refusal on real prose is still about 59%. Add real prose from a new source to the negatives, then test a threshold around .6. The licences and article count as dev data now, so measuring this honestly needs prose that hasn't been looked at.
 
 **After that:**
 
@@ -449,6 +471,7 @@ SCORE_TEST=1 scripts/run_experiment.sh E9-s2 593157a 2
 SCORE_TEST=1 scripts/run_experiment.sh E10-s2 ede75ca 2
 node eval/score.mjs eval/typos-dev.json; node eval/score.mjs eval/typos-dev-clean.json
 SCORE_TEST=1 scripts/run_experiment.sh E11-s2 5074d3b 2
+node eval/examples.mjs dev -v                    # examples as a safety net, scored on held-out strings
 node train/label_real.mjs train/real_labels.jsonl   # needs StructuredRegex train.tsv in eval/external/streg/
 node eval/refuse-real.mjs /usr/share/licenses/spdx/GPL-3.0-only.txt   # any text files; the article text isn't committed
 ```
