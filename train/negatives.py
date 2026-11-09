@@ -2,6 +2,14 @@
 
 A lone word stays a valid literal ("hello"), so negatives have at least three tokens or are symbols.
 """
+import os
+
+# E13: sentences from public-domain books (train/prose.py). Real prose uses words the grammar gives roles to
+# ("with", "and", "letters"), which the made-up negatives avoid, and it got through 41% of the time.
+PROSE_RATE = 25
+_PROSE = os.path.join(os.path.dirname(__file__), "prose.txt")
+PROSE = open(_PROSE, encoding="utf-8").read().split("\n") if os.path.exists(_PROSE) else []
+PROSE = [s for s in PROSE if s]
 SALAD = """time year people way day man woman child world life hand part place week case point company number
 group problem fact house room school water car city night money story month book eye job friend family
 food door river tree garden kitchen table chair window street road bridge mountain forest ocean island farm
@@ -125,7 +133,11 @@ class Negatives:
             return " ".join(self.c(EMOJI) for _ in range(self.r.randint(2, 5)))
         return " ".join(self.c(SYMBOLS) * self.r.randint(2, 4) for _ in range(self.r.randint(2, 4)))
 
+    def prose(self):
+        s = self.c(PROSE)
+        return s.lower() if self.r.random() < 0.2 else s
+
     def sample(self):
-        kinds = [(self.mash, 22), (self.sentence, 26), (self.question, 18), (self.chat, 6), (self.code, 12), (self.foreign, 8), (self.symbols, 8)]
-        fns, weights = zip(*kinds)
+        kinds = [(self.prose, PROSE_RATE)] * bool(PROSE) + [(self.mash, 22), (self.sentence, 26), (self.question, 18), (self.chat, 6), (self.code, 12), (self.foreign, 8), (self.symbols, 8)]
+        fns, weights = zip(*kinds)  # without prose: 100 in all
         return self.r.choices(fns, weights)[0]()
