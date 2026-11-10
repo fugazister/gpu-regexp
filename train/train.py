@@ -16,7 +16,7 @@ import torch
 import torch.nn.functional as F
 
 sys.path.insert(0, os.path.dirname(__file__))
-from features import N_ROWS, SLOTS, featurize, tokenize
+from features import N_ROWS, OFFSETS, SIZES, SLOTS, featurize, tokenize
 from grammar import MAX_TOKENS, ROLES, Gen, build_fixed
 from model import ScanTagger
 
@@ -74,6 +74,31 @@ def make_batch(g, n, real=(), rng=None):
     return rows, labels, lengths
 
 
+def ablation_masks(model, parts, d):
+    """Round 9: which weights to hold at zero. The model keeps its shape, so export and the JS backends work unchanged."""
+    masks = []
+    for part in parts:
+        if part == "conv":
+            masks.append((model.conv, torch.ones_like(model.conv, dtype=torch.bool)))
+        elif part == "pool":  # head1 sees [token, sentence mean]; zero the mean's columns
+            m = torch.zeros_like(model.head1.w, dtype=torch.bool)
+            m[:, d:] = True
+            masks.append((model.head1.w, m))
+        elif part in SIZES:
+            m = torch.zeros_like(model.emb, dtype=torch.bool)
+            m[OFFSETS[part]:OFFSETS[part] + SIZES[part]] = True
+            masks.append((model.emb, m))
+        else:
+            raise SystemExit(f"unknown --ablate part {part!r}")
+    return masks
+
+
+def zero_ablated(model, masks):
+    with torch.no_grad():
+        for p, m in masks:
+            p.masked_fill_(m.to(p.device), 0.0)
+
+
 def worker(q, fixed, seed, n, real):
     """put() blocks while the bounded queue is full, so workers can't outrun training."""
     rng = random.Random(seed)
@@ -95,6 +120,7 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--out", default="train/out")
+    ap.add_argument("--ablate", default="", help="comma list of parts held at zero: conv, pool, or a feature group (word, skel, pre, suf, shape, length)")
     a = ap.parse_args()
     torch.manual_seed(a.seed)
     torch.set_num_threads(a.threads)
@@ -105,6 +131,8 @@ def main():
     print(f"real descriptions with inferred labels: {len(real)}", flush=True)
     model = ScanTagger(N_ROWS, len(ROLES), a.d, a.layers, a.hidden).to(a.device)
     print(f"device={a.device} params={sum(p.numel() for p in model.parameters())} roles={len(ROLES)}", flush=True)
+    masks = ablation_masks(model, [x for x in a.ablate.split(",") if x], a.d)
+    zero_ablated(model, masks)
     opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, a.lr, total_steps=a.steps, pct_start=0.05)
 
@@ -130,6 +158,7 @@ def main():
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         opt.step()
         sched.step()
+        zero_ablated(model, masks)
         ema = loss.item() if ema is None else 0.98 * ema + 0.02 * loss.item()
         if step % 500 == 0 or step == a.steps:
             pred = logits.argmax(-1)
