@@ -2,9 +2,9 @@
 
 ## Status
 
-- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), Round 4 (typos), Round 5 (relabelling), Round 6 (a compiler fix; E12 not shipped), and Round 7 (examples as a safety net). The E11-s2 model is live with the new compiler and example boxes.
+- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), Round 4 (typos), Round 5 (relabelling), Round 6 (a compiler fix; E12 not shipped), Round 7 (examples as a safety net), and Round 8 (refusing real prose). The E13-s2 model is live.
 - **Now:** Nothing is running.
-- **Next:** Better refusal on real prose (see [Next](#next)).
+- **Next:** Model experiments or LLM-paraphrased data (see [Next](#next)).
 
 ## Round 1: Can better training data beat the limits?
 
@@ -437,6 +437,46 @@ The examples must not grade themselves. `eval/examples.mjs` splits each Structur
 - **It can't fix what no reading can express.** When nothing fits, the page says so and shows which examples fail.
 - **Overfitting to examples is real.** Some fixes pass the held-out strings while still reading the description loosely, for example `(?:[^\w\s]|[a-z])5` for "special characters, lowercase letters, or the number 5".
 
+## Round 8: Refusing real prose
+
+**Short answer:** Training on real book sentences fixed refusal. On two books nobody read, refusal went from 62% to 96%, at no cost to real requests. A confidence threshold couldn't do that.
+
+### Why prose got through
+
+The made-up negatives (word salad, chat, code, foreign text) deliberately left out words the grammar gives a role to, such as "with", "and" and "letters", after E1 showed that contradictory labels hurt. Real prose is full of those words, so the model had never seen them in a sentence that isn't a request.
+
+### E13
+
+E13 (`7198d09`) adds 6,000 sentences from six Project Gutenberg books (Pride and Prejudice, Sherlock Holmes, Origin of Species, Frankenstein, Tom Sawyer, A Tale of Two Cities) as a new kind of negative, about a fifth of all negatives. `train/prose.py` picks them with the same rules `eval/refuse-real.mjs` uses. Two other books, Moby Dick and The Art of War, give a frozen test of 400 sentences (`eval/refuse-prose-test.txt`). It was extracted without being printed, and scored once at the end.
+
+The alternative was a confidence threshold. On dev with E11-s2, a threshold of 0.6 took prose refusal from 167 to 237 of 284, but StructuredRegex dev fell from 51 right to 43.
+
+| Dev | E11-s1, s2 | E13-s1, s2 |
+|---|---:|---:|
+| Real prose refused /284 (licences and an article) | 149, 167 | **262, 269** |
+| Non-requests refused /30 | 27, 28 | 29, 29 |
+| StructuredRegex dev right /351 | 54, 51 | 53, 54 |
+| Own dev /60 | 58, 56 | 56, 57 |
+| `typos-dev` /39 | 28, 31 | 30, 28 |
+
+E13-s2 won on three of the four dev measures, and was picked before the frozen sets were scored.
+
+| Frozen, scored once | E11-s2 (with the Round 6 compiler) | **E13-s2 (shipped)** |
+|---|---:|---:|
+| Book sentences refused /300 | 187 (62%) | **289 (96%)** |
+| Of those, 16–30 words /129 | 66 | 127 |
+| Non-requests refused /60 | 56 | 58 |
+| StructuredRegex `teste`+`testi` /996 | 93 | 97 (13 gained, 9 lost) |
+| Own test /201 | 166 | 167 (3 gained, 2 lost) |
+| `typos` /20 | 18 | 16 |
+
+- **Training beat filtering again,** as in Round 2: the threshold only filters what the model believes, and training changed the belief.
+- **No cost to real requests could be detected.** StructuredRegex, own test and dev all held or rose. Examples mode on dev gives 88 with 3 + 3 (was 86).
+- **Typos fell by 2, probably noise.** On `typos-dev` the two models average the same (29.5 against 29).
+- **Long sentences were the problem, and are now the best part:** 127 of 129 refused, against 66 before.
+- **Not every refusal case is solved.** `Gray is plain text, including the spaces.` still gives `/ +/`, because it's about spaces.
+- **Checks:** round trip 100%, CPU parity OK, real GPU 0 role differences (checked that the game wasn't running first).
+
 ## What's still broken
 
 Prompts below are from the shipped model, on dev or made up by hand:
@@ -444,19 +484,19 @@ Prompts below are from the shipped model, on dev or made up by hand:
 | Prompt | Output | Problem |
 |---|---|---|
 | `digts folowed by a dahs` | `/\d+/`, confidence .76 | Better since E10 (was `/dahs/`), but a misspelt atom at the end still drops out |
-| `a filename with no spaces` | `/[^ ]*/`, confidence .62 | Loses the anchors: should be `^[^ ]*$` |
-| `Gray is plain text, including the spaces.` | `/Gray +/`, confidence .59 | Should refuse: real prose often gets through |
+| `a filename with no spaces` | `/[^ ]*/`, confidence .56 | Loses the anchors: should be `^[^ ]*$` |
+| `Gray is plain text, including the spaces.` | `/ +/`, confidence .94 | Should refuse: real prose often gets through |
 | `numbers with commas as thousands separators` | `/\d+,+/` | Not in the grammar, though it passes the lenient dev check |
 | `a string of exactly ten digits` | `/\d+/`, confidence .40 | Loses the count, cause unknown |
 | `(ab) three times` | `/(?:\(ab\)){3}/` | No group repetition (the parentheses are literal) |
 
 ## Next
 
-**Round 8 (recommended): better refusal on prose.** It was parked twice, and refusal on real prose is still about 59%. Add real prose from a new source to the negatives, then test a threshold around .6. The licences and article count as dev data now, so measuring this honestly needs prose that hasn't been looked at.
+**Round 9 (recommended): model experiments.** Ablate each layer, plot learning curves (does more data still help?), and run more seeds. Every round so far changed data, so this is the one place the architecture hasn't been questioned.
 
 **After that:**
 
-1. **Model experiments.** Ablation of each layer, learning curves (does more data still help?), a CRF output layer, and more seeds.
+1. **A CRF output layer,** so roles agree with their neighbours.
 2. **LLM-paraphrased training data, verified by the compiler.** Another direct attack on `natural`. [KB13 and NL-RX-Turk](https://github.com/nicholaslocascio/deep-regex) are also available as further independent tests, once match strings are generated for them.
 
 ## Reproduce
@@ -472,6 +512,8 @@ SCORE_TEST=1 scripts/run_experiment.sh E10-s2 ede75ca 2
 node eval/score.mjs eval/typos-dev.json; node eval/score.mjs eval/typos-dev-clean.json
 SCORE_TEST=1 scripts/run_experiment.sh E11-s2 5074d3b 2
 node eval/examples.mjs dev -v                    # examples as a safety net, scored on held-out strings
+SCORE_TEST=1 scripts/run_experiment.sh E13-s2 7198d09 2
+node eval/refuse-real.mjs eval/refuse-prose-test.txt   # frozen book prose
 node train/label_real.mjs train/real_labels.jsonl   # needs StructuredRegex train.tsv in eval/external/streg/
 node eval/refuse-real.mjs /usr/share/licenses/spdx/GPL-3.0-only.txt   # any text files; the article text isn't committed
 ```

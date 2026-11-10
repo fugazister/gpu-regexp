@@ -45,7 +45,7 @@ e.examples;    // { fit: true, tried, rank }, or { fit: false, failing: [...] }
 2. **Tag (WebGPU or CPU).** Summed embeddings, two layers of gated bidirectional scans, a 5-tap convolution, and a two-layer head. Weights are int6, trained with fake quantization.
 3. **Compile (CPU).** `web/compile.js` holds all the regex semantics. A 387-form lexicon decides what an `ATOM` span means, tolerating small typos. The model never writes regex text, so its mistakes produce a wrong regex, not an invalid one.
 
-Training data comes from a grammar (`train/grammar.py`) that emits labels and a gold regex built independently of the compiler. It also includes 226 real descriptions from StructuredRegex, whose word labels were inferred by searching for roles that compile to a regex behaving like the dataset's own (`train/label_real.mjs`).
+Training data comes from a grammar (`train/grammar.py`) that emits labels and a gold regex built independently of the compiler. It also includes 226 real descriptions from StructuredRegex, whose word labels were inferred by searching for roles that compile to a regex behaving like the dataset's own (`train/label_real.mjs`), and 6,000 sentences from public-domain books as text to refuse (`train/prose.py`).
 
 ## Results
 
@@ -53,26 +53,27 @@ Scored by behaviour: a prompt passes if its regex matches every string it should
 
 | Prompts | Passed |
 |---|---:|
-| Test set (201) | 166 (82.6%, 95% CI 76.7–87.2) |
-| Dev set (60) | 56 (93.3%) |
-| `natural` test prompts only (45) | 22 (49%) |
-| [StructuredRegex](https://github.com/xiye17/StructuredRegex), written by other people (996 across two test splits) | 93 (9.3%) |
-| StructuredRegex, only regexes the grammar could express (159) | 41 (25.8%) |
+| Test set (201) | 167 (83.1%, 95% CI 77.3–87.6) |
+| Dev set (60) | 57 (95.0%) |
+| `natural` test prompts only (45) | 23 (51%) |
+| [StructuredRegex](https://github.com/xiye17/StructuredRegex), written by other people (996 across two test splits) | 97 (9.7%) |
+| StructuredRegex, only regexes the grammar could express (159) | 43 (27.0%) |
 
 Giving examples helps more than any training change so far. On StructuredRegex's test splits, each description's strings were split: some went to `parseWithExamples`, and only the others decided pass or fail.
 
 | StructuredRegex test splits (996), scored on held-out strings | Passed |
 |---|---:|
-| Description only | 125 (12.6%) |
-| Plus 1 string that should match and 1 that shouldn't | 209 (21.0%) |
-| Plus 3 of each | 224 (22.5%) |
+| Description only | 129 (13.0%) |
+| Plus 1 string that should match and 1 that shouldn't | 215 (21.6%) |
+| Plus 3 of each | 233 (23.4%) |
 
-The description-only score is 125 here, not 93, because only the held-out strings are checked, and fewer strings let more regexes pass.
+The description-only score is 129 here, not 97, because only the held-out strings are checked, and fewer strings let more regexes pass.
 
 | Input that isn't a request | Refused |
 |---|---:|
-| Hand-written: mash, chat, code, foreign text (60) | 56 (93%) |
-| Real prose: licences and an article (284) | 167 (59%) |
+| Hand-written: mash, chat, code, foreign text (60) | 58 (97%) |
+| Real prose: licences and an article (284) | 269 (95%) |
+| Real prose from two books never looked at (300) | 289 (96%) |
 
 Read these with care. One author wrote the first three sets and the grammar, so they aren't independent. StructuredRegex is independent, and much harder than typing a short prompt: its descriptions are long and formal, and most describe regexes this project can't express. The real answer on everyday phrasing is somewhere in between. The checks are also lenient: a prompt can pass with a regex that's broader than it should be.
 
@@ -106,12 +107,12 @@ A single prompt is faster on the CPU, so the demo normally types on the CPU desp
 
 ## Limitations
 
-- **Natural phrasing often fails.** Only 49% of the `natural` test prompts pass.
+- **Natural phrasing often fails.** Only 51% of the `natural` test prompts pass.
 - **Coverage is the grammar and lexicon.** Thousands separators and group repetition (`(ab){3}`) aren't supported.
 - **Words it doesn't know can land in the regex.** `numbers with commas as thousands separators` gives `\d+,+`, which drops the digits after the comma.
-- **Refusal is partial, and confidence can't be trusted.** `the quick brown fox` and `asdf qwer zxcv` get no regex, but about 41% of real prose still gets one, more often for long sentences. Diagnostics only cover what the compiler can detect.
+- **Refusal is partial, and confidence can't be trusted.** About 5% of real prose still gets a regex, more often when it talks about text itself (`Gray is plain text, including the spaces.` gives `/ +/`). Diagnostics only cover what the compiler can detect.
 - **Mistakes can be silent.** `a string of exactly ten digits` loses the count and gives `\d+`.
-- **Typos still cost some prompts.** 18 of 20 typo test prompts pass, but `digts folowed by a dahs` still drops the dash and gives `\d+`.
+- **Typos still cost some prompts.** 16 of 20 typo test prompts pass, but `digts folowed by a dahs` still drops the dash and gives `\d+`.
 - **Presets are opinionated approximations**, such as email and URL. Generated patterns aren't checked for catastrophic backtracking, so don't run them on untrusted input without review.
 - The tokenizers can differ on unusual non-ASCII text; parity is tested on the generated prompts and a few handwritten edge cases, which are mostly ASCII.
 
@@ -144,3 +145,5 @@ The architecture and evaluation habits come from [gpu-lexer](https://gpu-lexer.v
 ## Third-party data
 
 `train/real_labels.jsonl` and `results/*.streg*.json` quote descriptions from [StructuredRegex](https://github.com/xiye17/StructuredRegex), used under [its MIT licence](licenses/StructuredRegex-MIT.txt).
+
+`train/prose.txt` and `eval/refuse-prose-test.txt` are sentences from public-domain books on [Project Gutenberg](https://www.gutenberg.org/): *Pride and Prejudice*, *The Adventures of Sherlock Holmes*, *On the Origin of Species*, *Frankenstein*, *The Adventures of Tom Sawyer* and *A Tale of Two Cities* for training, and *Moby Dick* and *The Art of War* for the test.
