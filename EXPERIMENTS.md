@@ -220,6 +220,8 @@ How much of StructuredRegex `train` + `dev` (2,524 descriptions) becomes express
 | Top-level `and` / `not` constraints | 77% |
 | Nested `and` / `not` inside a sequence | 100% |
 
+**Correction (2026-11-11):** the first two rows measure the narrow "in scope" rule above, not the compiler. The compiler could already join classes with "or" inside a sequence when this table was written, and 77 of the 226 real labels from Round 3 use it. Measured against what the compiler can build, it reaches 34% of `train` + `dev` (34.5% of the test splits), and adding repeated groups takes that to 49% (50%). Round 11 was first planned on the wrong reading and was corrected before any code changed.
+
 ## Round 2: Teaching it to refuse
 
 **Short answer:** Yes for short input, and only partly for real prose. Refusal went from 5% to 98% on the hand-written test, but real prose shows 66%, and that's the fairer number.
@@ -568,7 +570,7 @@ These are hypotheses, not tested causes:
 - **The rewrites are short.** Kept rewrites average 9.3 words, all rewrites 11.0, while StructuredRegex descriptions have a median of about 36 tokens and often several sentences. The filter keeps the short ones, which are the least like real descriptions.
 - **An LLM's idea of a user isn't a user.** StructuredRegex was written by crowdworkers describing regexes they were shown, and an LLM rewriting a grammar prompt writes differently.
 
-**What it suggests:** more data shaped like the grammar's own meanings won't close the gap. StructuredRegex's ceiling (see "How far could the score go?") is the other limit: only about 17% of its descriptions are expressible by the compiler at all.
+**What it suggests:** more data shaped like the grammar's own meanings won't close the gap. StructuredRegex's ceiling (see "How far could the score go?") is the other limit: the compiler can express only about 34% of its descriptions at all.
 
 ## What's still broken
 
@@ -588,7 +590,7 @@ Prompts below are from the shipped model, on dev or made up by hand:
 Round 10 (LLM paraphrases) gave no gain, so the next step waits on Max (forum t/169). The candidates:
 
 1. **More independent tests.** [KB13 and NL-RX-Turk](https://github.com/nicholaslocascio/deep-regex) can be used once match strings are generated for them.
-2. **Raise the compiler's ceiling:** choices of classes inside a sequence (`digit or letter`) would take expressible StructuredRegex descriptions from 17% to 30%.
+2. **Raise the compiler's ceiling:** repeated groups (`(ab) three times`, `a letter and a digit, repeated`) would take expressible StructuredRegex descriptions from 34% to 49%.
 3. **Remove the convolution** and train 30,000 steps, as a tidy-up with a frozen check.
 
 ## Reproduce
