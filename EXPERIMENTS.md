@@ -2,7 +2,7 @@
 
 ## Status
 
-- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), Round 4 (typos), Round 5 (relabelling), Round 6 (a compiler fix; E12 not shipped), Round 7 (examples as a safety net), Round 8 (refusing real prose), Round 9 (model experiments; nothing shipped), and a check that training on the PC's CPU matches the GPU. The E13-s2 model is live.
+- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), Round 4 (typos), Round 5 (relabelling), Round 6 (a compiler fix; E12 not shipped), Round 7 (examples as a safety net), Round 8 (refusing real prose), Round 9 (model experiments; nothing shipped), a check that training on the PC's CPU matches the GPU, and Round 10 (LLM paraphrases; no gain, not shipped). The E13-s2 model is live.
 - **Now:** Nothing is running.
 - **Next:** Data that looks like real users (see [Next](#next)).
 
@@ -534,6 +534,42 @@ Own dev (55.5 to 58 of 60) and hand-written refusal (28.5 to 30 of 30) barely mo
 - **Batch generation sets the pace.** Training ran at 9 to 11 steps a second, using about 0.5 GB of memory.
 - **Not measured:** real prose refusal and `typos-dev`, which `run_experiment.sh` doesn't score. The test sets weren't scored.
 
+## Round 10: Paraphrases from an LLM
+
+**Short answer:** No measurable gain. Training on 2,369 LLM paraphrases of grammar prompts left every dev measure within seed noise, so nothing was shipped and the frozen sets weren't scored.
+
+**Hypothesis:** the model reads the grammar's phrasing (98% on generated prompts) but not people's, so training on rewrites in people's words should help on real phrasing. Round 9 had shown the model isn't the limit.
+
+**Method:** E14 (`d67b118`, branch `exp/e14`):
+
+1. `train/para_prompts.py` took 2,000 grammar prompts, one per regex, without typos or refusal examples.
+2. Eight Claude Sonnet subagents wrote 2 rewrites of each "the way real people type a request". They saw each prompt's regex for its exact meaning, and never saw the eval sets.
+3. `train/label_para.mjs` labels each rewrite with Round 3's search, now shared in `train/label-lib.mjs`. A rewrite is kept only if its roles compile to **exactly** the original regex and pass Round 3's filters against spurious labels. Moving the search into the shared file was checked to give byte-identical labels from `label_real.mjs`.
+4. 2,369 of 4,000 rewrites were kept, covering 1,673 prompts. 30 read by hand were all correct.
+5. Training replaced 25% of the grammar's requests with kept rewrites, so the share of refusal examples didn't change.
+
+| Dev | E13, four seeds (GPU 1–2, CPU 1–2) | E14-s1, s2 |
+|---|---:|---:|
+| StructuredRegex dev /351 | 53, 54, 55, 50 | 56, 54 |
+| Own dev /60 | 56, 57, 57, 56 | 59, 57 |
+| `typos-dev` /39 | 30, 28 (GPU) | 31, 28 |
+| Non-requests refused /30 | 29, 29, 30, 29 | 30, 30 |
+| Generated (sequence) | 97.3–97.6% | 97.0%, 96.5% |
+
+- **No effect beyond noise.** Against the CPU run with the same seed, StructuredRegex dev was 8 gained and 7 lost (seed 1), and 10 gained and 6 lost (seed 2), with p=1.0 and p=0.45. The StructuredRegex average rose from 52.7 to 55, which is inside the 50 to 55 range of the six baseline seeds (four from Round 9 plus the two CPU runs).
+- **The gains don't repeat across seeds.** Only 1 StructuredRegex dev description passes with both E14 seeds and with none of the four E13 seeds, and 2 go the other way. A real effect would show up as answers both seeds gain.
+- **Generated accuracy fell slightly** (97.5% to 96.7% on average), as expected when a quarter of the grammar's requests are replaced.
+
+### Why it didn't help
+
+These are hypotheses, not tested causes:
+
+- **The filter keeps what the model can already read.** 79% of kept rewrites needed no change to the model's own labels, so they taught little. A rewrite the model and the search can't label is dropped, and those are the phrasings it most needs.
+- **The rewrites are short.** Kept rewrites average 9.3 words, all rewrites 11.0, while StructuredRegex descriptions have a median of about 36 tokens and often several sentences. The filter keeps the short ones, which are the least like real descriptions.
+- **An LLM's idea of a user isn't a user.** StructuredRegex was written by crowdworkers describing regexes they were shown, and an LLM rewriting a grammar prompt writes differently.
+
+**What it suggests:** more data shaped like the grammar's own meanings won't close the gap. StructuredRegex's ceiling (see "How far could the score go?") is the other limit: only about 17% of its descriptions are expressible by the compiler at all.
+
 ## What's still broken
 
 Prompts below are from the shipped model, on dev or made up by hand:
@@ -549,12 +585,11 @@ Prompts below are from the shipped model, on dev or made up by hand:
 
 ## Next
 
-**Round 10 (recommended): data that looks like real users.** Round 9 showed the model isn't the limit, and the grammar is already learned to 98%. Paraphrase grammar prompts with an LLM, keep only paraphrases whose compiled regex still behaves like the original, and train on them. This is a direct attack on `natural`, still the weakest category.
+Round 10 (LLM paraphrases) gave no gain, so the next step waits on Max (forum t/169). The candidates:
 
-**After that:**
-
-1. **Remove the convolution** and train 30,000 steps, as a tidy-up with a frozen check.
-2. **More independent tests.** [KB13 and NL-RX-Turk](https://github.com/nicholaslocascio/deep-regex) can be used once match strings are generated for them.
+1. **More independent tests.** [KB13 and NL-RX-Turk](https://github.com/nicholaslocascio/deep-regex) can be used once match strings are generated for them.
+2. **Raise the compiler's ceiling:** choices of classes inside a sequence (`digit or letter`) would take expressible StructuredRegex descriptions from 17% to 30%.
+3. **Remove the convolution** and train 30,000 steps, as a tidy-up with a frozen check.
 
 ## Reproduce
 
@@ -572,6 +607,8 @@ node eval/examples.mjs dev -v                    # examples as a safety net, sco
 SCORE_TEST=1 scripts/run_experiment.sh E13-s2 7198d09 2
 node eval/refuse-real.mjs eval/refuse-prose-test.txt   # frozen book prose
 PY=/home/orca/.venvs/gpu-regexp/bin/python WORKERS=2 scripts/run_experiment.sh E13-cpu-s1 7198d09 1   # on a PC worker; see scripts/pc-worker-brief.md
+python3 train/para_prompts.py train/para/prompts.jsonl && node train/label_para.mjs train/para/paraphrases.jsonl train/para_labels.jsonl   # Round 10, on exp/e14; the paraphrases came from subagents
+PY=/home/orca/.venvs/gpu-regexp/bin/python WORKERS=2 scripts/run_experiment.sh E14-s1 d67b118 1
 STEPS=15000 TRAIN_ARGS="--ablate conv" scripts/run_experiment.sh R9-noconv-s1 1579663 1   # Round 9 variants: --layers, --d, --hidden, --ablate
 node train/label_real.mjs train/real_labels.jsonl   # needs StructuredRegex train.tsv in eval/external/streg/
 node eval/refuse-real.mjs /usr/share/licenses/spdx/GPL-3.0-only.txt   # any text files; the article text isn't committed
