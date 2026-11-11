@@ -2,7 +2,7 @@
 
 ## Status
 
-- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), Round 4 (typos), Round 5 (relabelling), Round 6 (a compiler fix; E12 not shipped), Round 7 (examples as a safety net), Round 8 (refusing real prose), and Round 9 (model experiments; nothing shipped). The E13-s2 model is live.
+- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), Round 4 (typos), Round 5 (relabelling), Round 6 (a compiler fix; E12 not shipped), Round 7 (examples as a safety net), Round 8 (refusing real prose), Round 9 (model experiments; nothing shipped), and a check that training on the PC's CPU matches the GPU. The E13-s2 model is live.
 - **Now:** Nothing is running.
 - **Next:** Data that looks like real users (see [Next](#next)).
 
@@ -513,6 +513,27 @@ Own dev (55.5 to 58 of 60) and hand-written refusal (28.5 to 30 of 30) barely mo
 - **Each feature group has its own job.** Without the spelling features (skeleton, prefix, suffix), typo dev falls from 29 to 21, which is the job they were designed for. Without the whole-word hash, StructuredRegex drops by 6, because most words are spelt correctly and the exact word is the strongest clue.
 - **Longer training helps refusal a little.** Prose refusal grows from 245 at 3,000 steps to 268 at 30,000. 30,000 steps also gives the best StructuredRegex average (54.5), but within noise, so nothing was shipped.
 
+## Training on the PC's CPU
+
+**Short answer:** Yes, CPU training gives the same model as GPU training, within seed noise. It's about 3 to 4 times slower: 23 to 28 minutes per seed, against about 7 on the GPU.
+
+**Why it was checked:** training moved to a worker on Max's PC, which has no GPU access. Before CPU runs can be compared with the GPU runs in this log, they have to land in the same place.
+
+**Method:** the live setup (`7198d09`, 15,000 steps) was trained with seeds 1 and 2, with 2 batch workers and 2 torch threads, on torch 2.14.1 for CPU. It was scored on dev only.
+
+| Dev | E13-s1, s2 (GPU) | E13-cpu-s1, s2 (CPU) |
+|---|---:|---:|
+| Generated (sequence) | 97.3%, 97.6% | 97.5%, 97.4% |
+| Own dev /60 | 56, 57 | 57, 56 |
+| StructuredRegex dev /351 | 53, 54 | 55, 50 |
+| Non-requests refused /30 | 29, 29 | 30, 29 |
+| Minutes per seed | about 7 | 28, 23 |
+
+- **The device doesn't matter, within noise.** For the same seed, GPU against CPU on StructuredRegex dev is 5 gained and 3 lost (p=0.73) for seed 1, and 4 gained and 8 lost (p=0.39) for seed 2. The two GPU seeds differ by 9 gained and 8 lost, so the device moves about as many answers as the seed does. 50 to 55 is the same range Round 9 saw across four GPU seeds (50 to 54).
+- **The same seed doesn't give the same model across devices,** just as it didn't on one device (E6). So compare seeds as samples, not pairs.
+- **Batch generation sets the pace.** Training ran at 9 to 11 steps a second, using about 0.5 GB of memory.
+- **Not measured:** real prose refusal and `typos-dev`, which `run_experiment.sh` doesn't score. The test sets weren't scored.
+
 ## What's still broken
 
 Prompts below are from the shipped model, on dev or made up by hand:
@@ -550,6 +571,7 @@ SCORE_TEST=1 scripts/run_experiment.sh E11-s2 5074d3b 2
 node eval/examples.mjs dev -v                    # examples as a safety net, scored on held-out strings
 SCORE_TEST=1 scripts/run_experiment.sh E13-s2 7198d09 2
 node eval/refuse-real.mjs eval/refuse-prose-test.txt   # frozen book prose
+PY=/home/orca/.venvs/gpu-regexp/bin/python WORKERS=2 scripts/run_experiment.sh E13-cpu-s1 7198d09 1   # on a PC worker; see scripts/pc-worker-brief.md
 STEPS=15000 TRAIN_ARGS="--ablate conv" scripts/run_experiment.sh R9-noconv-s1 1579663 1   # Round 9 variants: --layers, --d, --hidden, --ablate
 node train/label_real.mjs train/real_labels.jsonl   # needs StructuredRegex train.tsv in eval/external/streg/
 node eval/refuse-real.mjs /usr/share/licenses/spdx/GPL-3.0-only.txt   # any text files; the article text isn't committed

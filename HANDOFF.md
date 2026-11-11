@@ -36,26 +36,27 @@ Rules that matter:
 - Compare runs with `eval/compare.mjs`, which does a paired sign test. Report Wilson CIs.
 - Run at least 2 seeds. A one-seed gain has fooled us before (E12).
 
-Training runs on the GPU box, reached as `ssh machine`, with a checkout at `~/projects/gpu-regexp` and a venv at `train/.venv`:
+Training runs as an Orca worker on Max's PC, on the CPU only (Max, 2026-11-11). There is no SSH, and the worker can't use the GPU. From the project's session on orca-server:
 
 ```sh
-ssh machine 'pgrep -x cs2 >/dev/null && { echo "cs2 running, not starting"; exit 1; }
-  cd ~/projects/gpu-regexp && git pull -q &&
-  nohup scripts/run_experiment.sh E14-s1 <commit> 1 > /tmp/E14-s1.log 2>&1 &'
+orca orchestration run-create --objective "<goal>"
+orca orchestration worker-start --run <run> --spec-file brief.md --on pc --repo name:gpu-regexp \
+  --worktree new-top-level --name <name> --base-branch origin/main --agent claude --model claude-opus-5-5 --effort medium
 ```
 
-- **GPU guard:** the box is also used for games. If `cs2` is running, don't use the GPU, and kill the run if it starts mid-run. The command has to abort on its own; printing a warning isn't enough.
+- **The brief is all the worker knows.** It can't see orca-server's disk. It runs `PY=/home/orca/.venvs/gpu-regexp/bin/python WORKERS=2 scripts/run_experiment.sh <name> <commit> <seed>` with `OMP_NUM_THREADS=1`, and pushes the result JSONs to an `exp/` branch. Merge that branch after reading the results. [scripts/pc-worker-brief.md](scripts/pc-worker-brief.md) is the brief that trained E13-cpu; copy it for a new run.
+- **Share the machine.** The PC's 12 cores and 24 GB are shared with other projects' workers, so keep `WORKERS=2`. Max can take the PC back at any time, so push after each seed. Ask Max before a long run until the server-mode signal (MQTT `pc/mode`) is live.
+- **CPU runs take 23 to 28 minutes per seed,** against about 7 on the old GPU box, and score the same within seed noise (EXPERIMENTS.md, "Training on the PC's CPU").
+- **The report** comes back as an Orca `worker_done` message. Wait for it with `orca orchestration check --run <run> --wait` in the background, then release the worker with `orca orchestration worker-release --dispatch <id>`.
 - `run_experiment.sh` trains the commit in its own worktree (`../gpu-regexp-exp/<name>`). It then exports the model, checks round trip and parity, scores dev, StructuredRegex dev and refusal dev, and writes `results/<name>.*.json` and `results/<name>.pt`. Options: `STEPS`, `WORKERS`, `PY` (the Python to use), `SCORE_TEST=1`, and `TRAIN_ARGS="--layers N --d N --ablate conv,..."`.
-- **Getting results back:**
-  - Copy the JSONs from `machine:~/projects/gpu-regexp/results/` with `scp`, and commit them. Checkpoints (`*.pt`) are gitignored.
-  - The box's checkout can collect untracked result files that block `git pull`. Delete only files that are byte-identical to `origin/main`.
+- **Checkpoints (`*.pt`) stay on the PC.** They're gitignored, so a model that may ship has to be exported by the worker that trained it.
 - **Shipping a model:**
-  1. Run `train/export.py results/<name>.pt`.
+  1. The worker runs `train/export.py results/<name>.pt` and pushes `web/model.*` to an `exp/` branch, never to main.
   2. Check that `node eval/roundtrip.mjs 3` reports 100% and `node eval/parity.mjs` reports OK.
-  3. Copy `web/model.*` to the box and run `node eval/native-gpu.mjs` there. It must show 0 role differences on the real GPU.
-  4. Push `web/` to main, then confirm the live files by md5.
+  3. `node eval/native-gpu.mjs` must show 0 role differences on a real GPU. PC workers have no GPU, so this check needs Max for now.
+  4. Push `web/` to main, then confirm the live files by md5. The demo deploys from GitHub, so this only ships once GitHub mirrors Forgejo.
 - External data:
-  - `eval/external/streg/` (StructuredRegex) isn't committed. Copy it next to each worktree; the scripts already do this.
+  - `eval/external/streg/` (StructuredRegex) isn't committed. A worker downloads the three TSVs from `raw.githubusercontent.com/xiye17/StructuredRegex/7d49aa2a176677fb5a553b05a6ad7d8fc24bc37d/data/raw/<split>.tsv`; `run_experiment.sh` copies them into its worktree.
   - `eval/refuse-prose-test.txt` is frozen: score it, never print it.
 
 ## Role of EXPERIMENTS.md
