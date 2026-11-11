@@ -2,7 +2,7 @@
 
 ## Status
 
-- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), Round 4 (typos), Round 5 (relabelling), Round 6 (a compiler fix; E12 not shipped), Round 7 (examples as a safety net), Round 8 (refusing real prose), Round 9 (model experiments; nothing shipped), a check that training on the PC's CPU matches the GPU, and Round 10 (LLM paraphrases; no gain, not shipped). The E13-s2 model is live.
+- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), Round 4 (typos), Round 5 (relabelling), Round 6 (a compiler fix; E12 not shipped), Round 7 (examples as a safety net), Round 8 (refusing real prose), Round 9 (model experiments; nothing shipped), a check that training on the PC's CPU matches the GPU, Round 10 (LLM paraphrases; no gain, not shipped), and Round 11 (optional counted items; the target moved, the total didn't; not shipped). The E13-s2 model is live.
 - **Now:** Nothing is running.
 - **Next:** Data that looks like real users (see [Next](#next)).
 
@@ -572,6 +572,34 @@ These are hypotheses, not tested causes:
 
 **What it suggests:** more data shaped like the grammar's own meanings won't close the gap. StructuredRegex's ceiling (see "How far could the score go?") is the other limit: the compiler can express only about 34% of its descriptions at all.
 
+## Round 11: Optional counted items
+
+**Short answer:** The compiler can now write "optionally 2 to 4 digits", and the trained model uses it: 4 of the 41 dev descriptions that need it now pass on both seeds, where none did before. The total stayed within seed noise, so it wasn't shipped and the frozen sets weren't scored.
+
+**Why this one:** of the StructuredRegex descriptions the compiler couldn't express, the most common shape is an optional counted item, such as "Optionally, it can end with two to four numbers" for `(?:\d{2,4})?`. Supporting it takes the expressible share from 34% to 44% (46% on the test splits). The round was first planned on a misread table (see the correction under "How far could the score go?").
+
+**Change** (E15, `5af996c`, branch `exp/e15`):
+
+1. `web/compile.js`: Q_OPT is a flag on the pending quantity, so with a count before or after the item it gives an optional group. "optional 2 digits" had given `\d?`, and "optional 2 to 4 letters" `[a-zA-Z]{2,4}`, because the last quantifier won. Without a count it works as before.
+2. `train/grammar.py`: 8% of quantified elements are optional counted items, with the gold regex built independently.
+3. `train/label_real.mjs` can reach them. Relabelling with the live model gave 309 labels: the same 226, plus 83 new, 56 of them with an optional count.
+
+**Checks before training:** round trip 100% on 20,000 cases, and parity OK. With the live weights, the new compiler changed no answer on own dev or StructuredRegex dev (0 gained, 0 lost), so it's safe on its own.
+
+| Dev | E13-cpu-s1, s2 | E15-s1, s2 |
+|---|---:|---:|
+| StructuredRegex dev /351 | 55, 50 | 56, 53 |
+| Of those, needing an optional group /41 | 0, 0 | **4, 4** |
+| Own dev /60 | 57, 56 | 56, 57 |
+| `typos-dev` /39 | (GPU seeds: 30, 28) | 27, 30 |
+| Non-requests refused /30 | 30, 29 | 30, 28 |
+
+- **The target moved, the total didn't.** Against the same seed, StructuredRegex dev was 8 gained and 7 lost (seed 1), and 13 gained and 10 lost (seed 2), with p=1.0 and p=0.68. Seed 2's 53 is inside the baseline's 50 to 55, so the acceptance criterion (beyond that range on both seeds) failed.
+- **The 4 are real.** They pass on both seeds and can't pass without the change, unlike gains that reshuffle between seeds. But 4 of 351 is about 1%, smaller than the seed noise.
+- **Why so small, as hypotheses:** 41 dev descriptions need the shape, and most of them also need something else the model reads poorly (long multi-sentence text, "a list of strings"). Only 56 training labels show it in real wording.
+
+**Decision:** not shipped. The compiler change is safe and could go out with a later model that clears the bar.
+
 ## What's still broken
 
 Prompts below are from the shipped model, on dev or made up by hand:
@@ -590,7 +618,7 @@ Prompts below are from the shipped model, on dev or made up by hand:
 Round 10 (LLM paraphrases) gave no gain, so the next step waits on Max (forum t/169). The candidates:
 
 1. **More independent tests.** [KB13 and NL-RX-Turk](https://github.com/nicholaslocascio/deep-regex) can be used once match strings are generated for them.
-2. **Raise the compiler's ceiling:** repeated groups (`(ab) three times`, `a letter and a digit, repeated`) would take expressible StructuredRegex descriptions from 34% to 49%.
+2. **Raise the compiler's ceiling:** optional counted items are built (Round 11, branch `exp/e15`). Separated lists ("strings separated by dots, each …") would add about 5 more points and need a new role.
 3. **Remove the convolution** and train 30,000 steps, as a tidy-up with a frozen check.
 
 ## Reproduce
