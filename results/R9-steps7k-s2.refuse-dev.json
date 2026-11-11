@@ -1,0 +1,194 @@
+{
+ "sweep": [
+  {
+   "threshold": 0,
+   "garbageRefused": 29,
+   "garbageTotal": 30,
+   "validPassed": 55,
+   "validTotal": 60,
+   "validRefused": 2,
+   "goodAnswersLost": 0,
+   "stregAnswered": 342,
+   "stregRight": 50,
+   "stregTotal": 351
+  },
+  {
+   "threshold": 0.5,
+   "garbageRefused": 29,
+   "garbageTotal": 30,
+   "validPassed": 55,
+   "validTotal": 60,
+   "validRefused": 4,
+   "goodAnswersLost": 0,
+   "stregAnswered": 311,
+   "stregRight": 47,
+   "stregTotal": 351
+  },
+  {
+   "threshold": 0.6,
+   "garbageRefused": 30,
+   "garbageTotal": 30,
+   "validPassed": 53,
+   "validTotal": 60,
+   "validRefused": 6,
+   "goodAnswersLost": 2,
+   "stregAnswered": 200,
+   "stregRight": 40,
+   "stregTotal": 351
+  },
+  {
+   "threshold": 0.7,
+   "garbageRefused": 30,
+   "garbageTotal": 30,
+   "validPassed": 53,
+   "validTotal": 60,
+   "validRefused": 6,
+   "goodAnswersLost": 2,
+   "stregAnswered": 136,
+   "stregRight": 37,
+   "stregTotal": 351
+  },
+  {
+   "threshold": 0.8,
+   "garbageRefused": 30,
+   "garbageTotal": 30,
+   "validPassed": 51,
+   "validTotal": 60,
+   "validRefused": 8,
+   "goodAnswersLost": 4,
+   "stregAnswered": 92,
+   "stregRight": 31,
+   "stregTotal": 351
+  },
+  {
+   "threshold": 0.9,
+   "garbageRefused": 30,
+   "garbageTotal": 30,
+   "validPassed": 50,
+   "validTotal": 60,
+   "validRefused": 10,
+   "goodAnswersLost": 5,
+   "stregAnswered": 64,
+   "stregRight": 28,
+   "stregTotal": 351
+  },
+  {
+   "threshold": 0.95,
+   "garbageRefused": 30,
+   "garbageTotal": 30,
+   "validPassed": 49,
+   "validTotal": 60,
+   "validRefused": 11,
+   "goodAnswersLost": 6,
+   "stregAnswered": 45,
+   "stregRight": 26,
+   "stregTotal": 351
+  },
+  {
+   "threshold": 0.98,
+   "garbageRefused": 30,
+   "garbageTotal": 30,
+   "validPassed": 48,
+   "validTotal": 60,
+   "validRefused": 12,
+   "goodAnswersLost": 7,
+   "stregAnswered": 36,
+   "stregRight": 23,
+   "stregTotal": 351
+  },
+  {
+   "threshold": 0.99,
+   "garbageRefused": 30,
+   "garbageTotal": 30,
+   "validPassed": 46,
+   "validTotal": 60,
+   "validRefused": 14,
+   "goodAnswersLost": 9,
+   "stregAnswered": 30,
+   "stregRight": 19,
+   "stregTotal": 351
+  },
+  {
+   "threshold": 0.995,
+   "garbageRefused": 30,
+   "garbageTotal": 30,
+   "validPassed": 35,
+   "validTotal": 60,
+   "validRefused": 25,
+   "goodAnswersLost": 20,
+   "stregAnswered": 24,
+   "stregRight": 16,
+   "stregTotal": 351
+  }
+ ],
+ "calibration": [
+  {
+   "lo": 0,
+   "hi": 0.5,
+   "n": 33,
+   "mean": 0.4337540662150056,
+   "right": 3
+  },
+  {
+   "lo": 0.5,
+   "hi": 0.8,
+   "n": 223,
+   "mean": 0.616858074934526,
+   "right": 20
+  },
+  {
+   "lo": 0.8,
+   "hi": 0.95,
+   "n": 50,
+   "mean": 0.8813471981957663,
+   "right": 7
+  },
+  {
+   "lo": 0.95,
+   "hi": 0.99,
+   "n": 18,
+   "mean": 0.9751792629760175,
+   "right": 10
+  },
+  {
+   "lo": 0.99,
+   "hi": 1.01,
+   "n": 76,
+   "mean": 0.9973635687207253,
+   "right": 65
+  }
+ ],
+ "garbageConfidence": [
+  0.5812056754282514
+ ],
+ "cats": {
+  "mash": [
+   5,
+   6
+  ],
+  "sentence": [
+   6,
+   6
+  ],
+  "question": [
+   5,
+   5
+  ],
+  "chat": [
+   4,
+   4
+  ],
+  "code": [
+   3,
+   3
+  ],
+  "foreign": [
+   3,
+   3
+  ],
+  "symbols": [
+   3,
+   3
+  ]
+ }
+}

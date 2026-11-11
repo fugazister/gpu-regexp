@@ -2,9 +2,9 @@
 
 ## Status
 
-- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), Round 4 (typos), Round 5 (relabelling), Round 6 (a compiler fix; E12 not shipped), Round 7 (examples as a safety net), and Round 8 (refusing real prose). The E13-s2 model is live.
+- **Done:** Round 1 data fixes, an independent score, the sentence period fix, Round 2 (refusal), Round 3 (real descriptions), Round 4 (typos), Round 5 (relabelling), Round 6 (a compiler fix; E12 not shipped), Round 7 (examples as a safety net), Round 8 (refusing real prose), and Round 9 (model experiments; nothing shipped). The E13-s2 model is live.
 - **Now:** Nothing is running.
-- **Next:** Model experiments or LLM-paraphrased data (see [Next](#next)).
+- **Next:** Data that looks like real users (see [Next](#next)).
 
 ## Round 1: Can better training data beat the limits?
 
@@ -477,6 +477,42 @@ E13-s2 won on three of the four dev measures, and was picked before the frozen s
 - **Not every refusal case is solved.** `Gray is plain text, including the spaces.` still gives `/ +/`, because it's about spaces.
 - **Checks:** round trip 100%, CPU parity OK, real GPU 0 role differences (checked that the game wasn't running first).
 
+## Round 9: What each part of the model is worth
+
+**Short answer:** The model is not what holds this project back. Making it bigger, smaller, or training it longer barely moves the scores on real text. The scan layers and the spelling features matter, and the convolution does nothing.
+
+### The method
+
+Every variant was trained twice with the shipped data and code (`1579663`), and scored on dev only. A new `--ablate` option holds a part at zero during training, so the model keeps its shape and the browser code scores it unchanged. The shipped setup got four seeds to measure noise: StructuredRegex dev ranges from 50 to 54, so only a gap beyond about ±3 means anything. The numbers below are seed averages; every run is in `results/R9-summary.tsv`.
+
+| Variant | Params | Generated | `typos-dev` /39 | StructuredRegex dev /351 | Real prose refused /284 |
+|---|---:|---:|---:|---:|---:|
+| **Shipped (4 seeds)** | 44,140 | 97.4% | 29.0 | 52.8 | 262 |
+| No scan layers | 36,988 | 93.3% | 29.0 | **46.0** | **236** |
+| 1 scan layer | 40,564 | 96.5% | 30.5 | 50.0 | 250 |
+| 3 scan layers | 47,716 | 98.0% | 30.5 | 50.5 | 268 |
+| No convolution | 44,140 | 97.3% | 29.5 | 54.0 | 261 |
+| No sentence average | 44,140 | 97.3% | 27.0 | 53.0 | **246** |
+| No whole-word hash | 44,140 | 95.9% | 29.5 | **46.5** | 259 |
+| Whole-word hash only (no skeleton, prefix, suffix) | 44,140 | 93.2% | **21.0** | 47.5 | 265 |
+| Half width (d=16) | 27,388 | 94.8% | 30.0 | 50.0 | 260 |
+| Wider (d=32) | 62,940 | 98.3% | 30.5 | 51.5 | 264 |
+| 3,000 steps | 44,140 | 93.3% | 27.0 | 53.0 | 245 |
+| 7,500 steps | 44,140 | 96.2% | 28.0 | 52.5 | 259 |
+| 30,000 steps (shipped: 15,000) | 44,140 | 98.0% | 30.5 | 54.5 | 268 |
+
+Own dev (55.5 to 58 of 60) and hand-written refusal (28.5 to 30 of 30) barely moved for any variant, so they're left out.
+
+### What it shows
+
+- **Distribution shift, measured directly.** From 3,000 to 30,000 steps, accuracy on generated prompts went from 93% to 98%, while StructuredRegex dev stayed between 52.5 and 54.5. More training teaches the grammar better, not real phrasing. The same holds for width: 98.3% generated at d=32, with no gain on real text.
+- **Capacity isn't the limit.** Half the width (38% fewer parameters) and 50% more width both land within noise of the shipped model. What would help is data that looks like real users.
+- **The scan layers carry context.** Without them, StructuredRegex drops by about 7 and prose refusal by 26. One layer is in between, and a third adds nothing.
+- **The convolution does nothing.** Removing it changes no measure. It's only 120 weights, but it could go.
+- **The sentence average is what refusal uses.** Without it, prose refusal drops by 16 and the other measures hold. Deciding whether a whole sentence is a request is the one job that needs a view of the whole sentence.
+- **Each feature group has its own job.** Without the spelling features (skeleton, prefix, suffix), typo dev falls from 29 to 21, which is the job they were designed for. Without the whole-word hash, StructuredRegex drops by 6, because most words are spelt correctly and the exact word is the strongest clue.
+- **Longer training helps refusal a little.** Prose refusal grows from 245 at 3,000 steps to 268 at 30,000. 30,000 steps also gives the best StructuredRegex average (54.5), but within noise, so nothing was shipped.
+
 ## What's still broken
 
 Prompts below are from the shipped model, on dev or made up by hand:
@@ -492,12 +528,12 @@ Prompts below are from the shipped model, on dev or made up by hand:
 
 ## Next
 
-**Round 9 (recommended): model experiments.** Ablate each layer, plot learning curves (does more data still help?), and run more seeds. Every round so far changed data, so this is the one place the architecture hasn't been questioned.
+**Round 10 (recommended): data that looks like real users.** Round 9 showed the model isn't the limit, and the grammar is already learned to 98%. Paraphrase grammar prompts with an LLM, keep only paraphrases whose compiled regex still behaves like the original, and train on them. This is a direct attack on `natural`, still the weakest category.
 
 **After that:**
 
-1. **A CRF output layer,** so roles agree with their neighbours.
-2. **LLM-paraphrased training data, verified by the compiler.** Another direct attack on `natural`. [KB13 and NL-RX-Turk](https://github.com/nicholaslocascio/deep-regex) are also available as further independent tests, once match strings are generated for them.
+1. **Remove the convolution** and train 30,000 steps, as a tidy-up with a frozen check.
+2. **More independent tests.** [KB13 and NL-RX-Turk](https://github.com/nicholaslocascio/deep-regex) can be used once match strings are generated for them.
 
 ## Reproduce
 
@@ -514,6 +550,7 @@ SCORE_TEST=1 scripts/run_experiment.sh E11-s2 5074d3b 2
 node eval/examples.mjs dev -v                    # examples as a safety net, scored on held-out strings
 SCORE_TEST=1 scripts/run_experiment.sh E13-s2 7198d09 2
 node eval/refuse-real.mjs eval/refuse-prose-test.txt   # frozen book prose
+STEPS=15000 TRAIN_ARGS="--ablate conv" scripts/run_experiment.sh R9-noconv-s1 1579663 1   # Round 9 variants: --layers, --d, --hidden, --ablate
 node train/label_real.mjs train/real_labels.jsonl   # needs StructuredRegex train.tsv in eval/external/streg/
 node eval/refuse-real.mjs /usr/share/licenses/spdx/GPL-3.0-only.txt   # any text files; the article text isn't committed
 ```
