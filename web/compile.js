@@ -92,9 +92,11 @@ function renderElem(e, standalone) {
   if (e.word) return `\\b${e.alts ? `(?:${s})` : s}\\b${e.quant ?? ""}`;
   if (e.alts && !standalone) s = `(?:${s})`;
   // "3 numbers" means three digits: a count on \d+ applies to the digit, not to runs of digits.
-  if (s === "\\d+" && !e.alts && /^(\+|\*|\{[\d,]+\})$/.test(e.quant ?? "")) return "\\d" + e.quant;
-  if (e.quant && e.group) s = `(?:${s})`;
-  return s + (e.quant ?? "");
+  let out;
+  if (s === "\\d+" && !e.alts && /^(\+|\*|\{[\d,]+\})$/.test(e.quant ?? "")) out = "\\d" + e.quant;
+  else out = (e.quant && e.group ? `(?:${s})` : s) + (e.quant ?? "");
+  // "optionally 2 digits": the count and the optional both apply, so the counted item becomes an optional group.
+  return e.optGroup ? `(?:${out})?` : out;
 }
 
 /**
@@ -114,16 +116,26 @@ export function compile(tokens, roles, lex) {
   const flush = (flushingTimes = false) => {
     if (!pend) return;
     const e = lastElem();
+    if (pend.opt && pend.type === null && !pend.nums.length) {
+      // "optionally" after an item: an optional group if the item has its own count, else a plain "?".
+      if (!e) diagnostics.push("a quantity had nothing to apply to, so it was ignored");
+      else if (e.explicitQuant && e.quant) e.optGroup = true;
+      else e.quant = "?";
+      pend = null;
+      return;
+    }
+    const opt = pend.opt;
     const text = quantText(pend);
     if (pend.type === null) {
       // A bare count with nothing after it ("a vowel then two ...") belongs to something we couldn't read.
       // Only "<atom> 3 times" counts backwards, and that's applied before reaching here.
       if (!flushingTimes) { diagnostics.push("a count had nothing to apply to, so it was ignored"); pend = null; return; }
     }
-    if (e && text !== null) e.quant = text;
+    if (e && text !== null) { e.quant = text; e.explicitQuant = true; }
     else if (e && pend.type === "Q_MIN" && /^\{\d+\}$/.test(e.quant ?? "")) e.quant = e.quant.replace("}", ",}");
     else if (e && pend.type === "Q_MAX" && /^\{\d+\}$/.test(e.quant ?? "")) e.quant = e.quant.replace("{", "{0,");
     else diagnostics.push("a quantity had nothing to apply to, so it was ignored");
+    if (opt && e && e.quant) e.optGroup = true;
     pend = null;
   };
 
@@ -155,7 +167,17 @@ export function compile(tokens, roles, lex) {
     }
     if (pend) {
       const q = quantText(pend);
-      if (q !== null) { e.quant = q; e.explicitQuant = true; pend = null; }
+      if (q !== null) {
+        e.quant = q;
+        e.explicitQuant = true;
+        if (pend.opt) e.optGroup = !!q; // "optional 2 digits"; "optional 1 digit" is just "?"
+        if (pend.opt && !q) e.quant = "?";
+        pend = null;
+      } else if (pend.opt && pend.type === null && !pend.nums.length) {
+        e.quant = "?"; // "an optional digit"
+        e.explicitQuant = true;
+        pend = null;
+      }
     } else if (e.plural && !e.neg) {
       e.quant = "+";
     }
@@ -196,7 +218,8 @@ export function compile(tokens, roles, lex) {
     }
     if (QUANTS.has(role)) {
       pend ??= { type: null, nums: [] };
-      pend.type = role;
+      if (role === "Q_OPT") pend.opt = true; // combines with a count: "optionally 2 to 4 digits"
+      else pend.type = role;
       if (next === "Q_TIMES") flush(true);
       return;
     }

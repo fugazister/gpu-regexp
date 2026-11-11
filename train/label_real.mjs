@@ -65,7 +65,9 @@ function toRegex(n) {
 // What the compiler can write today. Searching anything else only wastes time.
 const isAtom = (n) => n.op === "leaf" || n.op === "const" || (n.op === "notcc" && n.kids[0].op === "leaf");
 const isChoice = (n) => isAtom(n) || (n.op === "or" && n.kids.every(isChoice));
-const isItem = (n) => isChoice(n) || (["repeat", "repeatatleast", "repeatrange", "optional", "star"].includes(n.op) && isChoice(n.kids[0]));
+const isCounted = (n) => isChoice(n) || (["repeat", "repeatatleast", "repeatrange", "optional", "star"].includes(n.op) && isChoice(n.kids[0]));
+// E15: an optional around a counted item ("optionally 2 to 4 digits") compiles to (?:\d{2,4})?.
+const isItem = (n) => isCounted(n) || (n.op === "optional" && isCounted(n.kids[0]));
 const isSeq = (n) => isItem(n) || (n.op === "concat" && n.kids.every(isSeq));
 const reachable = (n) => isSeq(n) || (["startwith", "endwith", "contain"].includes(n.op) && isSeq(n.kids[0]));
 

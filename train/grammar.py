@@ -45,6 +45,9 @@ PLAIN_LITS = "yes no on off in out up down start stop end true false get set new
 NEGATIVE_RATE = 0.12
 # E10: share of samples with one or two misspelt words (was 10%, one word of five letters or more).
 TYPO_RATE = 0.25
+# E15: share of quantified elements that are an optional counted item ("optionally 2 to 4 digits" -> (?:\d{2,4})?).
+# StructuredRegex often says this ("Optionally, it can end with two to four numbers"), and the compiler couldn't.
+OPT_COUNT_RATE = 0.08
 _ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
 KEY_NEIGHBOURS = {c: "".join(r[k] for r in _ROWS[max(0, i - 1):i + 2] for k in (j - 1, j, j + 1) if 0 <= k < len(r) and r[k] != c)
                   for i, row in enumerate(_ROWS) for j, c in enumerate(row)}
@@ -223,6 +226,21 @@ class Gen:
             return [S("at least", "Q_RANGE"), A1, S("and at most", "Q_RANGE"), B1, P], src + q
         return [A1, S("-", "Q_RANGE", True), S(B1[0], "NUM", True), P], src + q
 
+    def optional_counted(self):
+        """A counted item that may be left out: the optional and the count both apply."""
+        while True:
+            segs, rx = self.quantified()
+            # Only real counts, said before the item ("3 digits", "at least 3 digits", "2 to 4 digits").
+            if re.search(r"\{\d+(,\d*)?\}$", rx) and segs[0][1] in ("NUM", "Q_MIN", "Q_MAX", "Q_RANGE") or \
+                    (re.search(r"\{\d+(,\d*)?\}$", rx) and segs[0][0] == "exactly"):
+                break
+        gold = "(?:%s)?" % rx
+        if self.r.random() < 0.6:
+            return [S(self.c(["optional", "optionally", "maybe", "possibly"]), "Q_OPT")] + segs, gold
+        tail = self.c([[S("optionally", "Q_OPT")], [S(",", "O", True), S("optionally", "Q_OPT")],
+                       [S(self.c(["which are", "that are"])), S("optional", "Q_OPT")]])
+        return segs + tail, gold
+
     def lit_element(self):
         w = self.c(PLAIN_LITS) if self.r.random() < 0.15 else self.lit_word()
         L = self.lit_seg(w, loose=True)
@@ -308,6 +326,8 @@ class Gen:
     def element(self):
         k = self.r.random()
         if k < 0.60:
+            if self.r.random() < OPT_COUNT_RATE:
+                return self.optional_counted()
             return self.quantified()
         if k < 0.82:
             return self.lit_element()
