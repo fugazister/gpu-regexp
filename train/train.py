@@ -24,15 +24,18 @@ ROLE_ID = {r: i for i, r in enumerate(ROLES)}
 MAX_RSS_GB = 6  # abort rather than pressure a shared machine
 REAL_LABELS = os.path.join(os.path.dirname(__file__), "real_labels.jsonl")
 REAL_RATE = 0.15  # share of each batch taken from inferred labels on real descriptions
+PARA_LABELS = os.path.join(os.path.dirname(__file__), "para_labels.jsonl")
+PARA_RATE = 0.25  # Round 10: share of the grammar's requests (not its refusal examples) replaced by paraphrases
 NUM_WORDS = "one two three four five six seven eight nine ten".split()
 
 
-def load_real():
-    """Descriptions by other people, with roles inferred by train/label_real.mjs. Tokenizers must agree on them."""
-    if not os.path.exists(REAL_LABELS):
+def load_real(path=REAL_LABELS):
+    """Descriptions by other people, with roles inferred by train/label_real.mjs (or, for Round 10's paraphrases,
+    train/label_para.mjs). Tokenizers must agree on them."""
+    if not os.path.exists(path):
         return []
     real = []
-    with open(REAL_LABELS) as f:
+    with open(path) as f:
         for line in f:
             s = json.loads(line)
             toks = tokenize(s["text"])
@@ -58,7 +61,7 @@ def vary(r, toks, roles):
     return out, roles
 
 
-def make_batch(g, n, real=(), rng=None):
+def make_batch(g, n, real=(), rng=None, para=()):
     rows = np.zeros((n, MAX_TOKENS, SLOTS), dtype=np.int16)
     labels = np.full((n, MAX_TOKENS), -100, dtype=np.int8)
     lengths = np.zeros(n, dtype=np.int16)
@@ -68,6 +71,8 @@ def make_batch(g, n, real=(), rng=None):
         else:
             s = g.sample()
             toks, roles = tokenize(s["text"]), s["roles"]
+            if para and s["regex"] is not None and rng.random() < PARA_RATE:
+                toks, roles = vary(rng, *rng.choice(para))
         lengths[b] = len(toks)
         rows[b, : len(toks)] = [featurize(t) for t in toks]
         labels[b, : len(toks)] = [ROLE_ID[r] for r in roles]
@@ -99,12 +104,12 @@ def zero_ablated(model, masks):
             p.masked_fill_(m.to(p.device), 0.0)
 
 
-def worker(q, fixed, seed, n, real):
+def worker(q, fixed, seed, n, real, para):
     """put() blocks while the bounded queue is full, so workers can't outrun training."""
     rng = random.Random(seed)
     g = Gen(rng, fixed=fixed)
     while True:
-        q.put(make_batch(g, n, real, rng))
+        q.put(make_batch(g, n, real, rng, para))
 
 
 def main():
@@ -129,6 +134,8 @@ def main():
     fixed = build_fixed()
     real = load_real()
     print(f"real descriptions with inferred labels: {len(real)}", flush=True)
+    para = load_real(PARA_LABELS)
+    print(f"paraphrases with inferred labels: {len(para)}", flush=True)
     model = ScanTagger(N_ROWS, len(ROLES), a.d, a.layers, a.hidden).to(a.device)
     print(f"device={a.device} params={sum(p.numel() for p in model.parameters())} roles={len(ROLES)}", flush=True)
     masks = ablation_masks(model, [x for x in a.ablate.split(",") if x], a.d)
@@ -137,7 +144,7 @@ def main():
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, a.lr, total_steps=a.steps, pct_start=0.05)
 
     q = mp.Queue(maxsize=2 * a.workers)
-    procs = [mp.Process(target=worker, args=(q, fixed, a.seed * 1000 + i, a.bs, real), daemon=True) for i in range(a.workers)]
+    procs = [mp.Process(target=worker, args=(q, fixed, a.seed * 1000 + i, a.bs, real, para), daemon=True) for i in range(a.workers)]
     for p in procs:
         p.start()
 
