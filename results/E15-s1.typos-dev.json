@@ -1,0 +1,61 @@
+{
+ "file": "eval/typos-dev.json",
+ "pass": 27,
+ "total": 39,
+ "pct": 69.23076923076923,
+ "ci": [
+  53.5784513844354,
+  81.43424655401694
+ ],
+ "cats": {
+  "one": [
+   20,
+   24
+  ],
+  "many": [
+   7,
+   15
+  ]
+ },
+ "per": {
+  "numbrs": true,
+  "four digtis": true,
+  "fiev digits": true,
+  "captial letters": true,
+  "lowercase leters": true,
+  "begins wiht abc": true,
+  "strats with x": true,
+  "endswith .txt": true,
+  "ending wiht 99": true,
+  "contians cat": true,
+  "lines wihtout foo": true,
+  "one or mroe spaces": true,
+  "at leats 2 digits": true,
+  "emali": false,
+  "url adress": false,
+  "hex colour cdoe": true,
+  "a comam": true,
+  "a perid": true,
+  "alphanumric characters": true,
+  "no digits at al": false,
+  "a letter folowed by a digit": true,
+  "between 3 adn 5 letters": true,
+  "exactly six charcters": true,
+  "either cat ro dog": false,
+  "digts folowed by a dahs": false,
+  "thre digits folowed by a letter": false,
+  "strats wiht a capital leter": false,
+  "lnies containg error": true,
+  "two leters then for digits": true,
+  "ends wth a numbr": true,
+  "only digts and spcaes": false,
+  "optional minus sing then digits": true,
+  "wrods starting with q": true,
+  "a dat like 2024-01-31": false,
+  "uppercase leters folowed by digits": true,
+  "lines that dont contian bar": false,
+  "a word folowed by a comam": true,
+  "tow or more digits": false,
+  "a tiem like 12:30": false
+ }
+}
