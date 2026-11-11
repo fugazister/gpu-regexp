@@ -45,7 +45,7 @@ ssh machine 'pgrep -x cs2 >/dev/null && { echo "cs2 running, not starting"; exit
 ```
 
 - **GPU guard:** the box is also used for games. If `cs2` is running, don't use the GPU, and kill the run if it starts mid-run. The command has to abort on its own; printing a warning isn't enough.
-- `run_experiment.sh` trains the commit in its own worktree (`../gpu-regexp-exp/<name>`). It then exports the model, checks round trip and parity, scores dev, StructuredRegex dev and refusal dev, and writes `results/<name>.*.json` and `results/<name>.pt`. Options: `STEPS`, `WORKERS`, `SCORE_TEST=1`, and `TRAIN_ARGS="--layers N --d N --ablate conv,..."`.
+- `run_experiment.sh` trains the commit in its own worktree (`../gpu-regexp-exp/<name>`). It then exports the model, checks round trip and parity, scores dev, StructuredRegex dev and refusal dev, and writes `results/<name>.*.json` and `results/<name>.pt`. Options: `STEPS`, `WORKERS`, `PY` (the Python to use), `SCORE_TEST=1`, and `TRAIN_ARGS="--layers N --d N --ablate conv,..."`.
 - **Getting results back:**
   - Copy the JSONs from `machine:~/projects/gpu-regexp/results/` with `scp`, and commit them. Checkpoints (`*.pt`) are gitignored.
   - The box's checkout can collect untracked result files that block `git pull`. Delete only files that are byte-identical to `origin/main`.

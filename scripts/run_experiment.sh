@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Trains and scores one commit in its own worktree, so results always match the code that made them.
 #   scripts/run_experiment.sh <name> <commit> [seed]
+# PY is the Python to train with (default: train/.venv in this checkout).
 # TRAIN_ARGS passes extra options to train.py, such as "--layers 1" or "--ablate conv".
 # Test sets are only scored when SCORE_TEST=1: use that for the baseline and the final model, not each run.
 set -euo pipefail
@@ -13,7 +14,7 @@ rm -rf "$tree"
 git -C "$repo" worktree prune
 git -C "$repo" worktree add -q --detach "$tree" "$commit"
 cd "$tree"
-py=$repo/train/.venv/bin/python
+py=${PY:-$repo/train/.venv/bin/python}
 
 "$py" train/train.py --steps "${STEPS:-15000}" --bs 512 --workers "${WORKERS:-4}" --threads 2 --seed "$seed" --out train/out ${TRAIN_ARGS:-} > train/train.log 2>&1
 "$py" train/export.py train/out/tagger.pt
